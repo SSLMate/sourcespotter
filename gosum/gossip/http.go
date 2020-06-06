@@ -13,7 +13,7 @@ import (
 func ServeGossip(address string, w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	var sth gosum.STH
 
-	if err := db.QueryRow(`SELECT sth.tree_size, sth.root_hash, sth.signature FROM gosum_db db JOIN gosum_sth sth ON sth.db_id = db.id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &sth.RootHash, &sth.Signature); err != nil {
+	if err := db.QueryRow(`SELECT sth.tree_size, sth.root_hash, sth.signature FROM gosum.db JOIN gosum.sth ON sth.db_id = db.id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &sth.RootHash, &sth.Signature); err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "404 Sum Database Not Found", 404)
 		} else {
@@ -38,7 +38,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 
 	var sumdbid int
 	var key []byte
-	if err := db.QueryRow(`SELECT id, key FROM gosum_db WHERE address = $1`, address).Scan(&sumdbid, &key); err != nil {
+	if err := db.QueryRow(`SELECT id, key FROM gosum.db WHERE address = $1`, address).Scan(&sumdbid, &key); err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "404 Sum Database Not Found", 404)
 		} else {
@@ -58,7 +58,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 		return
 	}
 
-	_, err = db.Exec(`INSERT INTO gosum_sth (db_id, tree_size, root_hash, signature) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, sumdbid, sth.TreeSize, sth.RootHash, sth.Signature)
+	_, err = db.Exec(`INSERT INTO gosum.sth (db_id, tree_size, root_hash, signature) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING`, sumdbid, sth.TreeSize, sth.RootHash, sth.Signature)
 	if err != nil {
 		log.Print("receiveGossip: ", err)
 		http.Error(w, "500 Internal Database Error", 500)
