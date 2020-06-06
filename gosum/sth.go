@@ -1,0 +1,110 @@
+package gosum
+
+import (
+	"bytes"
+	"crypto/ed25519"
+	"encoding/base64"
+	"errors"
+	"fmt"
+	"strconv"
+
+	"software.sslmate.com/src/sourcespotter/merkle"
+)
+
+const (
+	sthPreamble    = "go.sum database tree"
+	keytypeEd25519 = 0x01
+)
+
+type STH struct {
+	TreeSize  uint64
+	RootHash  merkle.Hash
+	Signature []byte
+}
+
+func chompSTHLine(input []byte) ([]byte, []byte) {
+	newline := bytes.IndexByte(input, '\n')
+	if newline == -1 {
+		return nil, nil
+	}
+	return input[:newline], input[newline+1:]
+}
+
+func ParseSTH(input []byte, address string) (*STH, error) {
+	preamble, input := chompSTHLine(input)
+	sizeLine, input := chompSTHLine(input)
+	hashLine, input := chompSTHLine(input)
+	blankLine, input := chompSTHLine(input)
+	if !bytes.Equal(preamble, []byte(sthPreamble)) {
+		return nil, errors.New("doesn't look like an STH")
+	}
+	treeSize, err := strconv.ParseUint(string(sizeLine), 10, 64)
+	if err != nil {
+		return nil, fmt.Errorf("malformed tree size: %w", err)
+	}
+	rootHash, err := base64.StdEncoding.DecodeString(string(hashLine))
+	if err != nil {
+		return nil, fmt.Errorf("malformed root hash: %w", err)
+	}
+	if len(blankLine) != 0 {
+		return nil, errors.New("missing blank line at end of STH")
+	}
+	var signature []byte
+	signaturePrefix := []byte("\u2014 " + address + " ")
+	for {
+		var signatureLine []byte
+		signatureLine, input = chompSTHLine(input)
+		if signatureLine == nil {
+			break
+		}
+		if bytes.HasPrefix(signatureLine, signaturePrefix) {
+			signature = bytes.TrimPrefix(signatureLine, signaturePrefix)
+			break
+		}
+	}
+	if signature == nil {
+		return nil, fmt.Errorf("doesn't have a signature from %s", address)
+	}
+	signature, err = base64.StdEncoding.DecodeString(string(signature))
+	if err != nil {
+		return nil, fmt.Errorf("malformed signature: %w", err)
+	}
+	return &STH{
+		TreeSize:  treeSize,
+		RootHash:  rootHash,
+		Signature: signature,
+	}, nil
+}
+
+func (sth *STH) formatMessage() string {
+	return fmt.Sprintf("go.sum database tree\n%d\n%s\n", sth.TreeSize, base64.StdEncoding.EncodeToString(sth.RootHash))
+}
+
+func (sth *STH) Verify(key []byte) error {
+	if len(key) == 0 {
+		return errors.New("key is too short")
+	}
+	keyType, keyData := key[0], key[1:]
+	if len(sth.Signature) < 4 {
+		return errors.New("signature is too short")
+	}
+	signature := sth.Signature[4:] // first four bytes are pointless key hash
+	input := []byte(sth.formatMessage())
+
+	switch keyType {
+	case keytypeEd25519:
+		return verifyEd25519(keyData, input, signature)
+	default:
+		return fmt.Errorf("Unsupported key type %x", keyType)
+	}
+}
+func verifyEd25519(key []byte, input []byte, signature []byte) error {
+	if !ed25519.Verify(key, input, signature) {
+		return errors.New("signature is invalid")
+	}
+	return nil
+}
+
+func (sth *STH) Format(address string) string {
+	return fmt.Sprintf("%s\n\u2014 %s %s\n", sth.formatMessage(), address, base64.StdEncoding.EncodeToString(sth.Signature))
+}
