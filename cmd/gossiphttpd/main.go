@@ -51,15 +51,13 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/gosum/", http.StripPrefix("/gosum/", http.HandlerFunc(handleGosumGossip)))
 
-	for _, listener := range ourListeners {
-		go serveHTTP(listener, db, mux)
-	}
-	select {}
-}
+	server := http.Server{Handler: mux}
 
-func serveHTTP(listener net.Listener, db *sql.DB, handler http.Handler) {
-	server := http.Server{Handler: handler}
-	if err := server.Serve(listener); err != nil {
-		log.Fatal(err)
+	for _, listener := range ourListeners {
+		go func(listener net.Listener) {
+			log.Fatal(server.Serve(listener))
+		}(listener)
 	}
+
+	select {}
 }
