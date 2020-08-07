@@ -48,16 +48,17 @@ func main() {
 	}
 	defer db.Close()
 
-	http.Handle("/gosum/", http.StripPrefix("/gosum/", http.HandlerFunc(handleGosumGossip)))
+	mux := http.NewServeMux()
+	mux.Handle("/gosum/", http.StripPrefix("/gosum/", http.HandlerFunc(handleGosumGossip)))
 
 	for _, listener := range ourListeners {
-		go serveHTTP(listener, db)
+		go serveHTTP(listener, db, mux)
 	}
 	select {}
 }
 
-func serveHTTP(listener net.Listener, db *sql.DB) {
-	server := http.Server{}
+func serveHTTP(listener net.Listener, db *sql.DB, handler http.Handler) {
+	server := http.Server{Handler: handler}
 	if err := server.Serve(listener); err != nil {
 		log.Fatal(err)
 	}
