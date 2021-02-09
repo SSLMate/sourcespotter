@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	_ "github.com/lib/pq"
 	gosumgossip "software.sslmate.com/src/sourcespotter/gosum/gossip"
@@ -51,7 +52,12 @@ func main() {
 	mux := http.NewServeMux()
 	mux.Handle("/gosum/", http.StripPrefix("/gosum/", http.HandlerFunc(handleGosumGossip)))
 
-	server := http.Server{Handler: mux}
+	server := http.Server{
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  3 * time.Second,
+		Handler:      mux,
+	}
 
 	for _, listener := range ourListeners {
 		go func(listener net.Listener) {
