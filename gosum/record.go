@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"software.sslmate.com/src/sourcespotter/merkle"
+	"software.sslmate.com/src/certspotter/merkletree"
 )
 
 const (
@@ -95,6 +95,6 @@ func (record *Record) Format() []byte {
 	return []byte(record.formatSourceLine() + record.formatGomodLine())
 }
 
-func (record *Record) Hash() merkle.Hash {
-	return merkle.HashLeaf(record.Format())
+func (record *Record) Hash() merkletree.Hash {
+	return merkletree.HashLeaf(record.Format())
 }

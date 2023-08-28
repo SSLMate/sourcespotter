@@ -8,7 +8,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"software.sslmate.com/src/sourcespotter/merkle"
+	"software.sslmate.com/src/certspotter/merkletree"
 )
 
 const (
@@ -18,7 +18,7 @@ const (
 
 type STH struct {
 	TreeSize  uint64
-	RootHash  merkle.Hash
+	RootHash  merkletree.Hash
 	Signature []byte
 }
 
@@ -46,6 +46,9 @@ func ParseSTH(input []byte, address string) (*STH, error) {
 	if err != nil {
 		return nil, fmt.Errorf("malformed root hash: %w", err)
 	}
+	if len(rootHash) != merkletree.HashLen {
+		return nil, fmt.Errorf("root hash has wrong length (should be %d bytes long, not %d)", merkletree.HashLen, len(rootHash))
+	}
 	if len(blankLine) != 0 {
 		return nil, errors.New("missing blank line at end of STH")
 	}
@@ -71,16 +74,16 @@ func ParseSTH(input []byte, address string) (*STH, error) {
 	}
 	return &STH{
 		TreeSize:  treeSize,
-		RootHash:  rootHash,
+		RootHash:  (merkletree.Hash)(rootHash),
 		Signature: signature,
 	}, nil
 }
 
 func (sth *STH) formatMessage() string {
-	return fmt.Sprintf("go.sum database tree\n%d\n%s\n", sth.TreeSize, base64.StdEncoding.EncodeToString(sth.RootHash))
+	return fmt.Sprintf("go.sum database tree\n%d\n%s\n", sth.TreeSize, sth.RootHash.Base64String())
 }
 
-func (sth *STH) Verify(key []byte) error {
+func (sth *STH) Authenticate(key []byte) error {
 	if len(key) == 0 {
 		return errors.New("key is too short")
 	}
@@ -93,16 +96,27 @@ func (sth *STH) Verify(key []byte) error {
 
 	switch keyType {
 	case keytypeEd25519:
-		return verifyEd25519(keyData, input, signature)
+		return authenticateEd25519(keyData, input, signature)
 	default:
-		return fmt.Errorf("Unsupported key type %x", keyType)
+		return fmt.Errorf("unsupported key type %x", keyType)
 	}
 }
-func verifyEd25519(key []byte, input []byte, signature []byte) error {
+func authenticateEd25519(key []byte, input []byte, signature []byte) error {
 	if !ed25519.Verify(key, input, signature) {
 		return errors.New("signature is invalid")
 	}
 	return nil
+}
+
+func ParseAndAuthenticateSTH(input []byte, address string, key []byte) (*STH, error) {
+	sth, err := ParseSTH(input, address)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing STH: %w", err)
+	}
+	if err := sth.Authenticate(key); err != nil {
+		return nil, fmt.Errorf("error authenticating STH: %w", err)
+	}
+	return sth, nil
 }
 
 func (sth *STH) Format(address string) string {

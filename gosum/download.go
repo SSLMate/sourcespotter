@@ -4,18 +4,22 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
+	insecurerand "math/rand"
 	"net/http"
+	"time"
 )
 
+var httpClient = http.DefaultClient
+
 const (
-	tileSize       = 8
-	recordsPerTile = 1 << tileSize
+	TileSize       = 8
+	RecordsPerTile = 1 << TileSize
 )
 
 func splitRecords(input []byte) [][]byte {
-	records := make([][]byte, 0, recordsPerTile)
+	records := make([][]byte, 0, RecordsPerTile)
 	for {
 		nlnl := bytes.Index(input, []byte{'\n', '\n'})
 		if nlnl == -1 {
@@ -48,62 +52,131 @@ func formatTileIndex(tile uint64) string {
 }
 
 func fetch(ctx context.Context, url string) ([]byte, error) {
-	// TODO: use ctx for the request
-	resp, err := http.Get(url)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}
-	body, err := ioutil.ReadAll(resp.Body)
+	req.Header.Set("User-Agent", "sourcespotter")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+
+	body, err := io.ReadAll(resp.Body)
 	resp.Body.Close()
 	if err != nil {
-		return nil, fmt.Errorf("Error reading response from %s: %w", url, err)
+		return nil, fmt.Errorf("error reading response from %s: %w", url, err)
 	}
+
 	if resp.StatusCode != 200 {
 		return nil, fmt.Errorf("%s: %s: %s", url, resp.Status, body)
 	}
 	return body, nil
 }
 
+func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]*Record, error) {
+	tile := begin / RecordsPerTile
+	skip := begin % RecordsPerTile
+	count := end - tile*RecordsPerTile
+	if count > RecordsPerTile {
+		count = RecordsPerTile
+	}
+	log.Printf("fetchrecords: [%d, %d): tile=%d, skip=%d, count=%d", begin, end, tile, skip, count)
+
+	url := fmt.Sprintf("https://%s/tile/%d/data/%s", address, TileSize, formatTileIndex(tile))
+	if count < RecordsPerTile {
+		url += fmt.Sprintf(".p/%d", count)
+	}
+
+	response, err := fetch(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	records := splitRecords(response)
+	if uint64(len(records)) != count {
+		return nil, fmt.Errorf("%s returned %d records instead of %d", url, len(records), count)
+	}
+	records = records[skip:]
+
+	parsedRecords := make([]*Record, len(records))
+	for i, recordBytes := range records {
+		if parsedRecord, err := ParseRecord(recordBytes); err != nil {
+			return nil, fmt.Errorf("%s returned invalid record at %d: %w", url, skip+uint64(i), err)
+		} else {
+			parsedRecords[i] = parsedRecord
+		}
+	}
+	return parsedRecords, nil
+}
+
 func DownloadRecords(ctx context.Context, address string, begin, end uint64, recordsOut chan<- *Record) error {
-	for begin < end {
-		tile := begin / recordsPerTile
-		skip := begin % recordsPerTile
-		count := end - tile*recordsPerTile
-		if count > recordsPerTile {
-			count = recordsPerTile
-		}
-		log.Printf("DownloadRecords: [%d, %d): tile=%d, skip=%d, count=%d", begin, end, tile, skip, count)
+	numRetries := 0
 
-		url := fmt.Sprintf("https://%s/tile/%d/data/%s", address, tileSize, formatTileIndex(tile))
-		if count < recordsPerTile {
-			url += fmt.Sprintf(".p/%d", count)
-		}
-
-		response, err := fetch(ctx, url)
+	for begin < end && ctx.Err() == nil {
+		records, err := fetchRecords(ctx, address, begin, end)
 		if err != nil {
+			log.Printf("%s: error downloading records [%d,%d): %s", address, begin, end, err)
+			if err := randomSleep(ctx, 1*time.Second*(1<<numRetries), 2*time.Second*(1<<numRetries)); err != nil {
+				return err
+			}
+			if numRetries < 8 {
+				numRetries++
+			}
+			continue
+		}
+		numRetries = 0
+		if err := sendAllRecords(ctx, recordsOut, records); err != nil {
 			return err
 		}
+		begin += uint64(len(records))
+	}
+	return ctx.Err()
+}
 
-		records := splitRecords(response)
-		if uint64(len(records)) != count {
-			return fmt.Errorf("%s returned %d records instead of %d", url, len(records), count)
+func DownloadAndAuthenticateSTH(ctx context.Context, address string, key []byte) (*STH, error) {
+	url := fmt.Sprintf("https://%s/latest", address)
+
+	response, err := fetch(ctx, url)
+	if err != nil {
+		return nil, fmt.Errorf("error downloading STH: %w", err)
+	}
+
+	sth, err := ParseSTH(response, address)
+	if err != nil {
+		return nil, fmt.Errorf("error parsing STH downloaded from %s: %w", url, err)
+	}
+
+	if err := sth.Authenticate(key); err != nil {
+		return nil, fmt.Errorf("error authenticating STH downloaded from %s: %w", url, err)
+	}
+
+	return sth, nil
+}
+
+func sendAllRecords(ctx context.Context, ch chan<- *Record, values []*Record) error {
+	for _, value := range values {
+		if ctx.Err() != nil {
+			return ctx.Err()
 		}
-
-		for i, recordBytes := range records {
-			if uint64(i) < skip {
-				continue
-			}
-			record, err := ParseRecord(recordBytes)
-			if err != nil {
-				return fmt.Errorf("%s returned invalid record at %d: %w", url, i, err)
-			}
-			select {
-			case recordsOut <- record:
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-			begin++
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case ch <- value:
 		}
 	}
 	return nil
+}
+
+func randomSleep(ctx context.Context, minDuration time.Duration, maxDuration time.Duration) error {
+	duration := minDuration + time.Duration(insecurerand.Int63n(int64(maxDuration-minDuration)))
+	timer := time.NewTimer(duration)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
