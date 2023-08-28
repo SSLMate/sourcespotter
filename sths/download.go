@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"log"
 
-	"software.sslmate.com/src/sourcespotter/gosum"
+	"software.sslmate.com/src/sourcespotter/sumdb"
 )
 
 func Download(ctx context.Context, sumdbid int32, db *sql.DB) error {
@@ -16,7 +16,7 @@ func Download(ctx context.Context, sumdbid int32, db *sql.DB) error {
 		return fmt.Errorf("error loading info for sumdb %d: %w", sumdbid, err)
 	}
 
-	sth, err := gosum.DownloadAndAuthenticateSTH(ctx, address, key)
+	sth, err := sumdb.DownloadAndAuthenticateSTH(ctx, address, key)
 	if err != nil {
 		log.Printf("%s: %s", address, err)
 		return nil

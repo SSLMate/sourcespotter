@@ -9,7 +9,7 @@ import (
 
 	"github.com/lib/pq"
 	"software.sslmate.com/src/certspotter/merkletree"
-	"software.sslmate.com/src/sourcespotter/gosum"
+	"software.sslmate.com/src/sourcespotter/sumdb"
 	"src.agwa.name/go-dbutil"
 )
 
@@ -121,7 +121,7 @@ func (state *ingestState) checkpoint(ctx context.Context, verified bool) error {
 	return nil
 }
 
-func (state *ingestState) addRecord(ctx context.Context, record *gosum.Record) error {
+func (state *ingestState) addRecord(ctx context.Context, record *sumdb.Record) error {
 	leafHash := record.Hash()
 	position := state.tree.Size()
 	state.tree.Add(leafHash)
@@ -169,11 +169,11 @@ func Ingest(ctx context.Context, id int32, db *sql.DB) (bool, error) {
 		downloadBegin = state.tree.Size()
 		downloadEnd   = state.sths[len(state.sths)-1].TreeSize
 	)
-	records := make(chan *gosum.Record, gosum.RecordsPerTile*2)
+	records := make(chan *sumdb.Record, sumdb.RecordsPerTile*2)
 	var downloadErr error
 	go func() {
 		defer close(records)
-		downloadErr = gosum.DownloadRecords(ctx, state.address, downloadBegin, downloadEnd, records)
+		downloadErr = sumdb.DownloadRecords(ctx, state.address, downloadBegin, downloadEnd, records)
 	}()
 	for record := range records {
 		if err := state.addRecord(ctx, record); err != nil {

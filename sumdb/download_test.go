@@ -1,4 +1,4 @@
-package gosum
+package sumdb
 
 import (
 	"testing"

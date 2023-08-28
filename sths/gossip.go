@@ -8,11 +8,11 @@ import (
 	"net/http"
 
 	"software.sslmate.com/src/certspotter/merkletree"
-	"software.sslmate.com/src/sourcespotter/gosum"
+	"software.sslmate.com/src/sourcespotter/sumdb"
 )
 
 func ServeGossip(address string, w http.ResponseWriter, req *http.Request, db *sql.DB) {
-	var sth gosum.STH
+	var sth sumdb.STH
 	var rootHash []byte
 	if err := db.QueryRowContext(req.Context(), `SELECT sth.tree_size, sth.root_hash, sth.signature FROM gosum.db JOIN gosum.sth ON sth.db_id = db.db_id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &rootHash, &sth.Signature); err != nil {
 		if err == sql.ErrNoRows {
@@ -52,7 +52,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 		return
 	}
 
-	sth, err := gosum.ParseAndAuthenticateSTH(sthBytes, address, key)
+	sth, err := sumdb.ParseAndAuthenticateSTH(sthBytes, address, key)
 	if err != nil {
 		http.Error(w, "Invalid STH: "+err.Error(), 400)
 		return
