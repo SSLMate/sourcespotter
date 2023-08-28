@@ -138,7 +138,7 @@ func (state *ingestState) addRecord(ctx context.Context, record *sumdb.Record) e
 				return err
 			}
 		} else {
-			log.Printf("%s: root hash calculated from first %d entries (%x) does not match STH (%x)", state.address, state.tree.Size(), rootHash, state.sths[0].RootHash)
+			log.Printf("%s: root hash calculated from first %d entries (%x) does not match STH root hash (%x)", state.address, state.tree.Size(), rootHash, state.sths[0].RootHash)
 		}
 		state.sths = state.sths[1:]
 	}

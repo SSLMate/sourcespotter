@@ -82,7 +82,7 @@ func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]*Re
 	if count > RecordsPerTile {
 		count = RecordsPerTile
 	}
-	log.Printf("fetchrecords: [%d, %d): tile=%d, skip=%d, count=%d", begin, end, tile, skip, count)
+	//log.Printf("fetchrecords: [%d, %d): tile=%d, skip=%d, count=%d", begin, end, tile, skip, count)
 
 	url := fmt.Sprintf("https://%s/tile/%d/data/%s", address, TileSize, formatTileIndex(tile))
 	if count < RecordsPerTile {
