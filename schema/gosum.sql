@@ -57,7 +57,7 @@ BEGIN
 	RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER unverified_sth_inserted AFTER INSERT ON gosum.sth FOR EACH ROW WHEN (NEW.consistent IS NULL) EXECUTE PROCEDURE gosum.after_sth_insert();
+CREATE TRIGGER unverified_sth_inserted AFTER INSERT ON gosum.sth FOR EACH ROW WHEN (NEW.consistent IS NULL) EXECUTE PROCEDURE gosum.after_unverified_sth_insert();
 
 CREATE TABLE gosum.record (
 	db_id			int NOT NULL REFERENCES gosum.db,
