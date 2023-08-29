@@ -140,12 +140,12 @@ func handleGossip(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	var flags struct {
-		db     string
-		listen []string
+		db           string
+		listenGossip []string
 	}
 	flag.StringVar(&flags.db, "db", "", "Database address")
-	flag.Func("listen", "Socket to listen on, in go-listener syntax (repeatable)", func(arg string) error {
-		flags.listen = append(flags.listen, arg)
+	flag.Func("listen-gossip", "Socket for gossip server, in go-listener syntax (repeatable)", func(arg string) error {
+		flags.listenGossip = append(flags.listenGossip, arg)
 		return nil
 	})
 	flag.Parse()
@@ -171,19 +171,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	listeners, err := listener.OpenAll(flags.listen)
+	gossipListeners, err := listener.OpenAll(flags.listenGossip)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer listener.CloseAll(listeners)
+	defer listener.CloseAll(gossipListeners)
 
-	httpMux := http.NewServeMux()
-	httpMux.Handle("/gossip/", http.StripPrefix("/gossip/", http.HandlerFunc(handleGossip)))
-	httpServer := http.Server{
+	gossipServer := http.Server{
 		ReadTimeout:  5 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  3 * time.Second,
-		Handler:      httpMux,
+		Handler:      http.HandlerFunc(handleGossip),
 	}
 
 	group, ctx := errgroup.WithContext(context.Background())
@@ -204,10 +202,10 @@ func main() {
 			return ingestRecords(ctx, id, signals.newSTH)
 		})
 	}
-	for _, listener := range listeners {
+	for _, listener := range gossipListeners {
 		listener := listener
 		go func() {
-			log.Fatal(httpServer.Serve(listener))
+			log.Fatal(gossipServer.Serve(listener))
 		}()
 	}
 	log.Fatal(group.Wait())
