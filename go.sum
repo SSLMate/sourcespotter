@@ -12,5 +12,7 @@ software.sslmate.com/src/certspotter v0.16.0 h1:l4bGY1r/GZtexxyB9H5k49fdIVjTUTv5
 software.sslmate.com/src/certspotter v0.16.0/go.mod h1:UBTYJFx0U925uIxHTpGIufF1m3k5dbRqm2UVvFPKTCU=
 src.agwa.name/go-dbutil v0.4.1 h1:UjtJ3Jo60/o/Jekd/ClOrAAvDW7ZEUq4MhFjEHE69Jc=
 src.agwa.name/go-dbutil v0.4.1/go.mod h1:KhIlHhNAY+Jux9M70Pd+Nf8GI6NfXifGYhitSvfBtBs=
+src.agwa.name/go-dbutil v0.5.0 h1:+tCfc4+Cu1vH0JWxoAwvC5E8nAsKEGVkery35T6s6h4=
+src.agwa.name/go-dbutil v0.5.0/go.mod h1:SWprGb/QNr6vDIiinXII9ZE/qNFSlqUEx2EeP3fDYEs=
 src.agwa.name/go-listener v0.5.0 h1:UjXAdtPKO1o1T/6B25TlpJaG/EJao+UvUEpRZuGy8iA=
 src.agwa.name/go-listener v0.5.0/go.mod h1:vM7zjlskRnSbxbS8QTWYQIOfuKsn8SdJQH28RtouDTI=
