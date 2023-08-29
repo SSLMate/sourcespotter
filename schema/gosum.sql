@@ -13,6 +13,14 @@ CREATE TABLE gosum.db (
 );
 CREATE UNIQUE INDEX db_address ON gosum.db (address);
 
+CREATE FUNCTION gosum.after_verified_position_update() RETURNS trigger AS $$
+BEGIN
+	PERFORM pg_notify('gosum_events', jsonb_build_object('DBID', NEW.db_id, 'Event', 'new_position')::text);
+	RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER verified_position_updated AFTER UPDATE OF verified_position ON gosum.db FOR EACH ROW EXECUTE PROCEDURE gosum.after_verified_position_update();
+
 CREATE TABLE gosum.sth (
 	sth_id			bigserial NOT NULL,
 	db_id			int NOT NULL REFERENCES gosum.db,
@@ -42,6 +50,14 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER sth_insert BEFORE INSERT ON gosum.sth FOR EACH ROW EXECUTE PROCEDURE gosum.before_sth_insert();
+
+CREATE FUNCTION gosum.after_unverified_sth_insert() RETURNS trigger AS $$
+BEGIN
+	PERFORM pg_notify('gosum_events', jsonb_build_object('DBID', NEW.db_id, 'Event', 'new_sth')::text);
+	RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER unverified_sth_inserted AFTER INSERT ON gosum.sth FOR EACH ROW WHEN (NEW.consistent IS NULL) EXECUTE PROCEDURE gosum.after_sth_insert();
 
 CREATE TABLE gosum.record (
 	db_id			int NOT NULL REFERENCES gosum.db,

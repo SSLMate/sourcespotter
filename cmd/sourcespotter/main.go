@@ -3,8 +3,9 @@ package main
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"flag"
-	_ "github.com/lib/pq"
+	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 	"log"
 	"net/http"
@@ -16,41 +17,114 @@ import (
 	"time"
 )
 
-var (
-	db *sql.DB
+const (
+	downloadSTHInterval = 1 * time.Minute
+	auditSTHInterval    = 15 * time.Minute * 10
+	ingestSleep         = 5 * time.Minute * 10
+	dbChannelName       = `gosum_events`
 )
 
-const (
-	downloadSTHInterval = 5 * time.Minute
-	auditSTHInterval    = 15 * time.Minute
-	ingestSleep         = 1 * time.Minute
+var (
+	db           *sql.DB
+	dbListener   *pq.Listener
+	sumdbSignals = make(map[int32]signals)
 )
+
+type signals struct {
+	newSTH      signal
+	newPosition signal
+}
+
+func makeSignals() signals {
+	return signals{
+		newSTH:      makeSignal(),
+		newPosition: makeSignal(),
+	}
+}
+
+type signal chan struct{}
+
+func makeSignal() signal {
+	return make(chan struct{}, 1)
+}
+
+func (s signal) raise() {
+	select {
+	case s <- struct{}{}:
+	default:
+	}
+}
 
 func downloadSTHs(ctx context.Context, id int32) error {
-	return periodically(ctx, downloadSTHInterval, func() error {
+	return periodically(ctx, downloadSTHInterval, nil, func() error {
 		return sths.Download(ctx, id, db)
 	})
 }
 
-func auditSTHs(ctx context.Context, id int32) error {
-	return periodically(ctx, auditSTHInterval, func() error {
+func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{}) error {
+	return periodically(ctx, auditSTHInterval, newPositionSignal, func() error {
 		return sths.Audit(ctx, id, db)
 	})
 }
 
-func ingestRecords(ctx context.Context, id int32) error {
+func ingestRecords(ctx context.Context, id int32, newSTHSignal <-chan struct{}) error {
 	for ctx.Err() == nil {
-		progressed, err := records.Ingest(ctx, id, db)
-		if err != nil {
+		if _, err := records.Ingest(ctx, id, db); err != nil {
 			return err
 		}
-		if !progressed {
-			if err := sleep(ctx, ingestSleep); err != nil {
-				return err
-			}
+		if err := sleep(ctx, ingestSleep, newSTHSignal); err != nil {
+			return err
 		}
 	}
 	return ctx.Err()
+}
+
+func handleNotifications(ctx context.Context) error {
+	ticker := time.NewTicker(1 * time.Minute)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return nil
+		case <-ticker.C:
+			// ping server to force a reconnection if connection is broken
+			dbListener.Ping()
+		case n := <-dbListener.Notify:
+			handleNotification(n)
+		}
+	}
+}
+
+func handleNotification(n *pq.Notification) {
+	if n == nil {
+		// Database connection was re-established, so we may have missed notifications
+		// Don't do anything; just wait for stuff to happen on its normal schedule
+		return
+	}
+
+	var payload struct {
+		DBID  int32
+		Event string
+	}
+	if err := json.Unmarshal([]byte(n.Extra), &payload); err != nil {
+		log.Printf("Ignoring malformed database notification: %s", err)
+		return
+	}
+
+	signals, ok := sumdbSignals[payload.DBID]
+	if !ok {
+		log.Printf("Ignoring database notification for unknown sumdb %d", payload.DBID)
+		return
+	}
+
+	switch payload.Event {
+	case "new_sth":
+		signals.newSTH.raise()
+	case "new_position":
+		signals.newPosition.raise()
+	default:
+		log.Printf("Ignoring database notification with unknown event %q", payload.Event)
+	}
 }
 
 func handleGossip(w http.ResponseWriter, req *http.Request) {
@@ -87,6 +161,11 @@ func main() {
 	}
 	defer db.Close()
 
+	dbListener = pq.NewListener(flags.db, 5*time.Second, 2*time.Minute, nil)
+	if err := dbListener.Listen(dbChannelName); err != nil {
+		log.Fatal(err)
+	}
+
 	var enabledSumDBs []int32
 	if err := dbutil.QueryAll(context.Background(), db, &enabledSumDBs, `SELECT db_id FROM gosum.db WHERE enabled ORDER BY db_id`); err != nil {
 		log.Fatal(err)
@@ -108,16 +187,21 @@ func main() {
 	}
 
 	group, ctx := errgroup.WithContext(context.Background())
+	group.Go(func() error {
+		return handleNotifications(ctx)
+	})
 	for _, id := range enabledSumDBs {
 		id := id
+		signals := makeSignals()
+		sumdbSignals[id] = signals
 		group.Go(func() error {
 			return downloadSTHs(ctx, id)
 		})
 		group.Go(func() error {
-			return auditSTHs(ctx, id)
+			return auditSTHs(ctx, id, signals.newPosition)
 		})
 		group.Go(func() error {
-			return ingestRecords(ctx, id)
+			return ingestRecords(ctx, id, signals.newSTH)
 		})
 	}
 	for _, listener := range listeners {
@@ -129,7 +213,7 @@ func main() {
 	log.Fatal(group.Wait())
 }
 
-func sleep(ctx context.Context, duration time.Duration) error {
+func sleep(ctx context.Context, duration time.Duration, wakeup <-chan struct{}) error {
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 	select {
@@ -137,10 +221,12 @@ func sleep(ctx context.Context, duration time.Duration) error {
 		return ctx.Err()
 	case <-timer.C:
 		return nil
+	case <-wakeup:
+		return nil
 	}
 }
 
-func periodically(ctx context.Context, interval time.Duration, f func() error) error {
+func periodically(ctx context.Context, interval time.Duration, wakeup <-chan struct{}, f func() error) error {
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
 	if err := f(); err != nil {
@@ -154,6 +240,11 @@ func periodically(ctx context.Context, interval time.Duration, f func() error) e
 			if err := f(); err != nil {
 				return err
 			}
+		case <-wakeup:
+			if err := f(); err != nil {
+				return err
+			}
+			ticker.Reset(interval)
 		}
 	}
 }
