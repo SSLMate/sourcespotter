@@ -33,7 +33,7 @@
 		<tbody>
 			{{ range .SumDBs }}
 				<tr>
-					<td><a href="https://{{ .Address }}/">{{ .Address }}</a></td>
+					<td><a href="{{ .Address }}">{{ .Address }}</a></td>
 					<td>{{ .LargestSTHSize }}</td>
 					<td>{{ .LargestSTHTime }}</td>
 					<td>{{ .DownloadBacklog }}</td>
