@@ -62,6 +62,17 @@ func (state *ingestState) begin(ctx context.Context) error {
 		}
 	}()
 
+	var (
+		address string
+		tree    merkletree.CollapsedTree
+	)
+	if err := tx.QueryRowContext(ctx, `SELECT address, download_position FROM gosum.db WHERE db_id = $1 FOR UPDATE`, state.id).Scan(&address, dbutil.JSON(&tree)); err != nil {
+		return fmt.Errorf("error reloading sumdb %d: %w", state.id, err)
+	}
+	if address != state.address || !tree.Equal(state.tree) {
+		return fmt.Errorf("sumdb %d has been modified by a different process", state.id)
+	}
+
 	stmt, err := tx.PrepareContext(ctx, pq.CopyInSchema("gosum", "record", "db_id", "position", "module", "version", "source_sha256", "gomod_sha256", "root_hash"))
 	if err != nil {
 		return fmt.Errorf("error preparing COPY statement: %w", err)
