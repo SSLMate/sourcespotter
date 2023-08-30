@@ -1,6 +1,7 @@
 package sths
 
 import (
+	"context"
 	"database/sql"
 	"fmt"
 	"io"
@@ -64,7 +65,26 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 		return
 	}
 
+	consistent, err := isConsistent(req.Context(), db, sumdbid, sth)
+	if err != nil {
+		log.Printf("ReceiveGossip: error querying consistency of STH for sumdb %d: %s", sumdbid, err)
+		http.Error(w, "500 Internal Database Error", 500)
+		return
+	}
+
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.WriteHeader(204)
+	w.WriteHeader(200)
+	if !consistent.Valid {
+		fmt.Fprintf(w, "pending: we don't know yet if this STH is consistent with other STHs that we've seen from %s; we have have saved this STH and will audit it ASAP\n", address)
+	} else if consistent.Bool {
+		fmt.Fprintf(w, "consistent: this STH is consistent with other STHs that we've seen from %s\n", address)
+	} else {
+		fmt.Fprintf(w, "inconsistent: uh oh, this STH is NOT consistent with other STHs that we've seen from %s; it is possible that you have been served malicious code by the Go module proxy; we have saved this STH and will report it\n", address)
+	}
+}
+
+func isConsistent(ctx context.Context, db *sql.DB, sumdbid int32, sth *sumdb.STH) (consistent sql.NullBool, err error) {
+	err = db.QueryRowContext(ctx, `SELECT consistent FROM gosum.sth WHERE (db_id, tree_size, root_hash) = ($1, $2, $3)`, sumdbid, sth.TreeSize, sth.RootHash[:]).Scan(&consistent)
+	return
 }
