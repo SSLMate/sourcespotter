@@ -5,8 +5,10 @@
 	<title>Source Spotter - Go Checksum Database Auditor</title>
 	<style>
 		html, body { background: white; color: black; }
+		html { margin: 0; padding: 0; }
+		body { margin: 0; padding: 2rem; }
+		h1 { margin-top: 0; }
 		a { color: black; text-decoration: underline; }
-		.error { margin: 0; color: red; }
 		table {
 			border: solid black 1px;
 			border-collapse: collapse;
@@ -19,66 +21,119 @@
 		.failed {
 			background: #fde;
 		}
+		code {
+			background: #f3f3f3;
+			border: solid #e3e3e3 1px;
+			border-radius: 2px;
+			padding: 1px 3px;
+		}
+		section {
+			margin: 2rem 0;
+		}
 	</style>
 </head>
 <body>
 	<h1>Source Spotter</h1>
 
-	<h2>Monitored Databases</h2>
+	<p>
+		Source Spotter is an auditor for the <a href="https://sum.golang.org/">Go Checksum Database</a>.
+		It verifies that the Checksum Database has not violated its append-only property (by signing inconsistent STHs), or
+		published more than one record for a module version.
+	</p>
 
-	<table>
-		<thead>
-			<tr><th>Address</th><th>Size</th><th>Last Contacted</th><th>Download Backlog</th><th>Verify Backlog</th></tr>
-		</thead>
-		<tbody>
-			{{ range .SumDBs }}
-				<tr>
-					<td><a href="{{ .Address }}">{{ .Address }}</a></td>
-					<td>{{ .VerifiedSize }}</td>
-					<td>{{ .LargestSTHTime.Format "2006-01-02 15:04:05 UTC" }}</td>
-					<td>{{ .DownloadBacklog }}</td>
-					<td>{{ .VerifyBacklog }}</td>
-				</tr>
-			{{ end }}
-		</tbody>
-	</table>
+	<p>
+		Source Spotter is developed and operated by <a href="https://sslmate.com/">SSLMate</a>,
+		the creator of the <a href="https://sslmate.com/certspotter/">Cert Spotter Certificate Transparency Monitor</a>.
+	</p>
 
-	<h2>Inconsistent STHs</h2>
+	<section>
+		<h2>Monitored Databases</h2>
 
-	<table>
-		<thead>
-			<tr><th>Database</th><th>Tree Size</th><th>STH Root Hash</th><th>Expected Root Hash</th><th>Download</th></tr>
-		</thead>
-		<tbody>
-			{{ range .InconsistentSTHs }}
-				<tr>
-					<td>{{ .SumDB }}</td>
-					<td>{{ .TreeSize }}</td>
-					<td>{{ .RootHashString }}</td>
-					<td>{{ .CalculatedRootHashString }}</td>
-					<td><a download="{{ .SumDB }}-{{ .TreeSize }}.txt" href="{{ .DownloadURL }}">Download</a></td>
-				</tr>
-			{{ end }}
-		</tbody>
-	</table>
+		<p>These are the checksum databases that we monitor:</p>
 
-	<h2>Duplicate Records</h2>
+		<table>
+			<thead>
+				<tr><th>Database</th><th>Size</th><th>Latest STH Seen At</th><th>Download Backlog</th><th>Verify Backlog</th></tr>
+			</thead>
+			<tbody>
+				{{ range .SumDBs }}
+					<tr>
+						<td><a href="{{ .Address }}">{{ .Address }}</a></td>
+						<td>{{ .VerifiedSize }}</td>
+						<td>{{ .LargestSTHTime.Format "2006-01-02 15:04:05 UTC" }}</td>
+						<td>{{ .DownloadBacklog }}</td>
+						<td>{{ .VerifyBacklog }}</td>
+					</tr>
+				{{ end }}
+			</tbody>
+		</table>
+	</section>
+	<section>
+		<h2>Inconsistent STHs</h2>
 
-	<table>
-		<thead>
-			<tr><th>Database</th><th>Module</th><th>Version</th><th>Position</th><th>Previous Position</th></tr>
-		</thead>
-		<tbody>
-			{{ range .DuplicateRecords }}
-				<tr>
-					<td>{{ .SumDB }}</td>
-					<td>{{ .Module }}</td>
-					<td>{{ .Version }}</td>
-					<td>{{ .Position }}</td>
-					<td>{{ .PreviousPosition }}</td>
-				</tr>
-			{{ end }}
-		</tbody>
-	</table>
+		<p>If we detect any inconsistent STHs, they will be published here:</p>
+
+		<table>
+			<thead>
+				<tr><th>Database</th><th>Tree Size</th><th>STH Root Hash</th><th>Expected Root Hash</th><th>Download</th></tr>
+			</thead>
+			<tbody>
+				{{ range .InconsistentSTHs }}
+					<tr>
+						<td>{{ .SumDB }}</td>
+						<td>{{ .TreeSize }}</td>
+						<td>{{ .RootHashString }}</td>
+						<td>{{ .CalculatedRootHashString }}</td>
+						<td><a download="{{ .SumDB }}-{{ .TreeSize }}.txt" href="{{ .DownloadURL }}">Download</a></td>
+					</tr>
+				{{ end }}
+			</tbody>
+		</table>
+	</section>
+	<section>
+		<h2>Duplicate Records</h2>
+
+		<p>If we detect any duplicate records, they will be published here:</p>
+
+		<table>
+			<thead>
+				<tr><th>Database</th><th>Module</th><th>Version</th><th>Position</th><th>Previous Position</th></tr>
+			</thead>
+			<tbody>
+				{{ range .DuplicateRecords }}
+					<tr>
+						<td>{{ .SumDB }}</td>
+						<td>{{ .Module }}</td>
+						<td>{{ .Version }}</td>
+						<td>{{ .Position }}</td>
+						<td>{{ .PreviousPosition }}</td>
+					</tr>
+				{{ end }}
+			</tbody>
+		</table>
+	</section>
+	<section>
+		<h2>Gossip</h2>
+
+		<p>
+			To retrieve the latest STH that we've observed, <code>GET</code> the gossip endpoint, <code>https://gossip.sourcespotter.com/<var>$GOSUMDB</var></code>
+		</p>
+
+		<p>
+			For example, the gossip endpoint for sum.golang.org is <code><a href="https://gossip.sourcespotter.com/sum.golang.org">https://gossip.sourcespotter.com/sum.golang.org</a></code>
+		</p>
+
+		<p>
+			To upload an STH that you've observed, <code>POST</code> it to the gossip endpoint.
+		</p>
+
+		<p>
+			For example, to upload the STH that your Go toolchain has observed for sum.golang.org, you can run:
+		</p>
+
+		<p>
+			<code>curl --data-binary @$GOPATH/pkg/sumdb/sum.golang.org/latest https://gossip.sourcespotter.com/sum.golang.org</code>
+		</p>
+	</section>
 </body>
 </html>
