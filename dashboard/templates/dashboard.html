@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8"/>
+	<title>Source Spotter - Go Checksum Database Auditor</title>
+	<style>
+		html, body { background: white; color: black; }
+		a { color: black; text-decoration: underline; }
+		.error { margin: 0; color: red; }
+		table {
+			border: solid black 1px;
+			border-collapse: collapse;
+		}
+		td, th {
+			border: solid black 1px;
+			padding: 0.3rem 0.4rem;
+			text-align: left;
+		}
+		.failed {
+			background: #fde;
+		}
+	</style>
+</head>
+<body>
+	<h1>Source Spotter</h1>
+
+	<h2>Monitored Databases</h2>
+
+	<table>
+		<thead>
+			<tr><th>Address</th><th>Size</th><th>Last Updated</th><th>Download Backlog</th><th>Verify Backlog</th></tr>
+		</thead>
+		<tbody>
+			{{ range .SumDBs }}
+				<tr>
+					<td><a href="https://{{ .Address }}/">{{ .Address }}</a></td>
+					<td>{{ .LargestSTHSize }}</td>
+					<td>{{ .LargestSTHTime }}</td>
+					<td>{{ .DownloadBacklog }}</td>
+					<td>{{ .VerifyBacklog }}</td>
+				</tr>
+			{{ end }}
+		</tbody>
+	</table>
+
+	<h2>Inconsistent STHs</h2>
+
+	<table>
+		<thead>
+			<tr><th>Database</th><th>Tree Size</th><th>STH Root Hash</th><th>Expected Root Hash</th><th>Download</th></tr>
+		</thead>
+		<tbody>
+			{{ range .InconsistentSTHs }}
+				<tr>
+					<td>{{ .SumDB }}</td>
+					<td>{{ .TreeSize }}</td>
+					<td>{{ .RootHashString }}</td>
+					<td>{{ .CalculatedRootHashString }}</td>
+					<td><a download="{{ .SumDB }}-{{ .TreeSize }}.txt" href="{{ .DownloadURL }}">Download</a></td>
+				</tr>
+			{{ end }}
+		</tbody>
+	</table>
+
+	<h2>Duplicate Records</h2>
+
+	<table>
+		<thead>
+			<tr><th>Database</th><th>Module</th><th>Version</th><th>Position</th><th>Previous Position</th></tr>
+		</thead>
+		<tbody>
+			{{ range .DuplicateRecords }}
+				<tr>
+					<td>{{ .SumDB }}</td>
+					<td>{{ .Module }}</td>
+					<td>{{ .Version }}</td>
+					<td>{{ .Position }}</td>
+					<td>{{ .PreviousPosition }}</td>
+				</tr>
+			{{ end }}
+		</tbody>
+	</table>
+</body>
+</html>

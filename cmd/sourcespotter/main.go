@@ -9,6 +9,7 @@ import (
 	"golang.org/x/sync/errgroup"
 	"log"
 	"net/http"
+	"software.sslmate.com/src/sourcespotter/dashboard"
 	"software.sslmate.com/src/sourcespotter/records"
 	"software.sslmate.com/src/sourcespotter/sths"
 	"src.agwa.name/go-dbutil"
@@ -128,6 +129,10 @@ func handleNotification(n *pq.Notification) {
 	}
 }
 
+func handleDashboard(w http.ResponseWriter, req *http.Request) {
+	dashboard.ServeHTTP(w, req, db)
+}
+
 func handleGossip(w http.ResponseWriter, req *http.Request) {
 	address := strings.TrimLeft(req.URL.Path, "/")
 	if req.Method == http.MethodGet {
@@ -141,10 +146,15 @@ func handleGossip(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	var flags struct {
-		db           string
-		listenGossip []string
+		db              string
+		listenDashboard []string
+		listenGossip    []string
 	}
 	flag.StringVar(&flags.db, "db", "", "Database address")
+	flag.Func("listen-dashboard", "Socket for dashboard server, in go-listener syntax (repeatable)", func(arg string) error {
+		flags.listenDashboard = append(flags.listenDashboard, arg)
+		return nil
+	})
 	flag.Func("listen-gossip", "Socket for gossip server, in go-listener syntax (repeatable)", func(arg string) error {
 		flags.listenGossip = append(flags.listenGossip, arg)
 		return nil
@@ -170,6 +180,19 @@ func main() {
 	var enabledSumDBs []int32
 	if err := dbutil.QueryAll(context.Background(), db, &enabledSumDBs, `SELECT db_id FROM gosum.db WHERE enabled ORDER BY db_id`); err != nil {
 		log.Fatal(err)
+	}
+
+	dashboardListeners, err := listener.OpenAll(flags.listenDashboard)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer listener.CloseAll(dashboardListeners)
+
+	dashboardServer := http.Server{
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  3 * time.Second,
+		Handler:      http.HandlerFunc(handleDashboard),
 	}
 
 	gossipListeners, err := listener.OpenAll(flags.listenGossip)
@@ -202,6 +225,12 @@ func main() {
 		group.Go(func() error {
 			return ingestRecords(ctx, id, signals.newSTH)
 		})
+	}
+	for _, listener := range dashboardListeners {
+		listener := listener
+		go func() {
+			log.Fatal(dashboardServer.Serve(listener))
+		}()
 	}
 	for _, listener := range gossipListeners {
 		listener := listener
