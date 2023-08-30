@@ -28,13 +28,12 @@
 
 	<table>
 		<thead>
-			<tr><th>Address</th><th>Size</th><th>Last Updated</th><th>Download Backlog</th><th>Verify Backlog</th></tr>
 		</thead>
 		<tbody>
 			{{ range .SumDBs }}
 				<tr>
 					<td><a href="{{ .Address }}">{{ .Address }}</a></td>
-					<td>{{ .LargestSTHSize }}</td>
+					<td>{{ .VerifiedSize }}</td>
 					<td>{{ .LargestSTHTime }}</td>
 					<td>{{ .DownloadBacklog }}</td>
 					<td>{{ .VerifyBacklog }}</td>
