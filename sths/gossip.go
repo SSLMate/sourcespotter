@@ -80,7 +80,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 	} else if consistent.Bool {
 		fmt.Fprintf(w, "consistent: this STH is consistent with other STHs that we've seen from %s\n", address)
 	} else {
-		fmt.Fprintf(w, "inconsistent: uh oh, this STH is NOT consistent with other STHs that we've seen from %s; it is possible that you have been served malicious code by the Go module proxy; we have saved this STH and will report it\n", address)
+		fmt.Fprintf(w, "inconsistent: uh oh, this STH is NOT consistent with other STHs that we've seen from %s; it is possible that you have been served malicious code by the Go Module Mirror; we have saved this STH and will report it\n", address)
 	}
 }
 

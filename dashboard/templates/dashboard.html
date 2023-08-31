@@ -30,21 +30,42 @@
 		section {
 			margin: 2rem 0;
 		}
+		li {
+			margin-top: 0.5em;
+			margin-bottom: 0.5em;
+		}
 	</style>
 </head>
 <body>
 	<h1>Source Spotter</h1>
 
 	<p>
-		Source Spotter is an auditor for the <a href="https://sum.golang.org/">Go Checksum Database</a>.
-		It verifies that the Checksum Database has not violated its append-only property (by signing inconsistent STHs), or
-		published more than one record for a module version.
+		Source Spotter is an auditor for the <a href="https://sum.golang.org/">Go Module Mirror and Checksum Database</a>.
+		Source Spotter verifies that the Checksum Database has not reported more than one checksum for the
+		same module version, which might indicate that Module Mirror has served malicious code to some clients.
 	</p>
 
 	<p>
-		Source Spotter is developed and operated by <a href="https://sslmate.com/">SSLMate</a>,
-		the creator of the <a href="https://sslmate.com/certspotter/">Cert Spotter Certificate Transparency Monitor</a>.
+		The <a href="https://research.swtch.com/tlog">Checkum Database works</a> by putting module checksums
+		in a Merkle Tree, and periodically signing and publishing the root of the tree, called a Signed Tree Head
+		(STH).  Different parties can exchange STHs to verify that the Checksum Database has not given them inconsistent
+		information, which may indicate that the Module Mirror has served one of the parties a malicious module.
 	</p>
+	<p>
+		You can verify that your Go toolchain's view of the Checksum Database is consistent with Source Spotter's view
+		by uploading the STH from your <code>$GOPATH</code> to Source Spotter's STH Gossip endpoint:
+	</p>
+	<p>
+		<code>curl --data-binary "@$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest" https://gossip.sourcespotter.com/sum.golang.org</code>
+	</p>
+	<p>
+		Source Spotter will reply with one of the following codes:
+	</p>
+	<ul>
+		<li><code>consistent</code> - your Go toolchain and Source Spotter have been given the same information by the Checksum Database</li>
+		<li><code>inconsistent</code> - your Go toolchain and Source Spotter have been given different information by the Checksum Database, suggesting that someone has been served a malicious module; the STH will be published on this page as evidence of the Checksum Database's misbehavior</li>
+		<li><code>pending</code> - we don't know yet if this STH is consistent with other STHs that we've seen; we will audit it ASAP and publish it on this page if it's inconsistent</li>
+	</ul>
 
 	<section>
 		<h2>Monitored Databases</h2>
@@ -53,16 +74,17 @@
 
 		<table>
 			<thead>
-				<tr><th>Database</th><th>Size</th><th>Latest STH Seen At</th><th>Download Backlog</th><th>Verify Backlog</th></tr>
+				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH Seen</th><th>Largest Verified STH</th><th>Verify Backlog</th><th>Download Backlog</th></tr>
 			</thead>
 			<tbody>
 				{{ range .SumDBs }}
 					<tr>
-						<td><a href="{{ .Address }}">{{ .Address }}</a></td>
-						<td>{{ .VerifiedSize }}</td>
+						<td>{{ .Address }}</td>
 						<td>{{ .LargestSTHTime.Format "2006-01-02 15:04:05 UTC" }}</td>
-						<td>{{ .DownloadBacklog }}</td>
+						<td>{{ .LargestSTHSize }}</td>
+						<td>{{ .VerifiedSize }} (<a href="{{ .Address }}">Download</a>)</td>
 						<td>{{ .VerifyBacklog }}</td>
+						<td>{{ .DownloadBacklog }}</td>
 					</tr>
 				{{ end }}
 			</tbody>
@@ -71,7 +93,7 @@
 	<section>
 		<h2>Inconsistent STHs</h2>
 
-		<p>If we detect any inconsistent STHs, they will be published here:</p>
+		<p>If we detect any STHs that are inconsistent with the Largest Verified STH shown above, they will be disclosed here:</p>
 
 		<table>
 			<thead>
@@ -93,7 +115,7 @@
 	<section>
 		<h2>Duplicate Records</h2>
 
-		<p>If we detect any duplicate records, they will be published here:</p>
+		<p>If we detect that a checksum database has published more than one record for a module version, it will be disclosed here:</p>
 
 		<table>
 			<thead>
@@ -132,7 +154,14 @@
 		</p>
 
 		<p>
-			<code>curl --data-binary @$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest https://gossip.sourcespotter.com/sum.golang.org</code>
+			<code>curl --data-binary "@$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest" https://gossip.sourcespotter.com/sum.golang.org</code>
+		</p>
+	</section>
+	<section>
+		<h2>Credits</h2>
+		<p>
+			Source Spotter is developed and operated by <a href="https://sslmate.com/">SSLMate</a>,
+			the creator of the <a href="https://sslmate.com/certspotter/">Cert Spotter Certificate Transparency Monitor</a>.
 		</p>
 	</section>
 </body>
