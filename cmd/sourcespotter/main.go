@@ -7,6 +7,7 @@ import (
 	"flag"
 	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
+	"html/template"
 	"log"
 	"net/http"
 	"software.sslmate.com/src/sourcespotter/dashboard"
@@ -27,9 +28,10 @@ const (
 )
 
 var (
-	db           *sql.DB
-	dbListener   *pq.Listener
-	sumdbSignals = make(map[int32]signals)
+	db                *sql.DB
+	dbListener        *pq.Listener
+	dashboardTemplate *template.Template
+	sumdbSignals      = make(map[int32]signals)
 )
 
 type signals struct {
@@ -132,7 +134,7 @@ func handleNotification(n *pq.Notification) {
 func handleGossip(w http.ResponseWriter, req *http.Request) {
 	address := strings.TrimLeft(req.URL.Path, "/")
 	if address == "" {
-		dashboard.ServeHTTP(w, req, db)
+		dashboard.ServeHTTP(w, req, db, dashboardTemplate)
 	} else if req.Method == http.MethodGet {
 		sths.ServeGossip(address, w, req, db)
 	} else if req.Method == http.MethodPost {
@@ -144,10 +146,12 @@ func handleGossip(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	var flags struct {
-		db           string
-		listenGossip []string
+		db                string
+		dashboardTemplate string
+		listenGossip      []string
 	}
 	flag.StringVar(&flags.db, "db", "", "Database address")
+	flag.StringVar(&flags.dashboardTemplate, "dashboard-template", "", "Path to alternative dashboard template")
 	flag.Func("listen-gossip", "Socket for gossip server, in go-listener syntax (repeatable)", func(arg string) error {
 		flags.listenGossip = append(flags.listenGossip, arg)
 		return nil
@@ -168,6 +172,14 @@ func main() {
 	dbListener = pq.NewListener(flags.db, 5*time.Second, 2*time.Minute, nil)
 	if err := dbListener.Listen(dbChannelName); err != nil {
 		log.Fatal(err)
+	}
+
+	if flags.dashboardTemplate != "" {
+		if ret, err := template.ParseFiles(flags.dashboardTemplate); err == nil {
+			dashboardTemplate = ret
+		} else {
+			log.Fatal(err)
+		}
 	}
 
 	var enabledSumDBs []int32

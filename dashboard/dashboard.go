@@ -18,7 +18,7 @@ import (
 //go:embed templates/*
 var content embed.FS
 
-var dashboardTemplate = template.Must(template.ParseFS(content, "templates/dashboard.html"))
+var defaultDashboardTemplate = template.Must(template.ParseFS(content, "templates/dashboard.html"))
 
 type SumDB struct {
 	Address        string
@@ -133,7 +133,10 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 	return dashboard, nil
 }
 
-func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB) {
+func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB, template *template.Template) {
+	if template == nil {
+		template = defaultDashboardTemplate
+	}
 	dashboard, err := LoadDashboard(req.Context(), db)
 	if err != nil {
 		log.Printf("error loading dashboard: %s", err)
@@ -143,5 +146,5 @@ func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Xss-Protection", "0")
 	w.WriteHeader(http.StatusOK)
-	dashboardTemplate.Execute(w, dashboard)
+	template.Execute(w, dashboard)
 }
