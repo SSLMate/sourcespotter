@@ -70,11 +70,9 @@
 	<section>
 		<h2>Monitored Databases</h2>
 
-		<p>These are the checksum databases that we monitor:</p>
-
 		<table>
 			<thead>
-				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH Seen</th><th>Largest Verified STH</th><th>Verify Backlog</th><th>Download Backlog</th></tr>
+				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH</th><th>Largest Verified STH</th><th>Verify Backlog</th><th>Download Backlog</th></tr>
 			</thead>
 			<tbody>
 				{{ range .SumDBs }}
@@ -93,7 +91,7 @@
 	<section>
 		<h2>Inconsistent STHs</h2>
 
-		<p>If we detect any STHs that are inconsistent with the Largest Verified STH shown above, they will be disclosed here:</p>
+		<p>If Source Spotter detects any STHs that are inconsistent with the Largest Verified STH shown above, they will be disclosed here:</p>
 
 		<table>
 			<thead>
@@ -115,7 +113,7 @@
 	<section>
 		<h2>Duplicate Records</h2>
 
-		<p>If we detect that a checksum database has published more than one record for a module version, it will be disclosed here:</p>
+		<p>If Source Spotter detects that a checksum database has published more than one record for a module version, it will be disclosed here:</p>
 
 		<table>
 			<thead>
