@@ -44,6 +44,9 @@
 			margin-top: 0.5em;
 			margin-bottom: 0.5em;
 		}
+		.version {
+			font-style: italic;
+		}
 	</style>
 </head>
 <body>
@@ -120,6 +123,10 @@
 			Source Spotter is developed by <a href="https://sslmate.com/">SSLMate</a>,
 			the creator of the <a href="https://sslmate.com/certspotter/">Cert Spotter Certificate Transparency Monitor</a>.
 		</p>
+
+		{{ if .BuildInfo }}
+			<p class="version">{{ .BuildInfo.Main.Path }}@{{ .BuildInfo.Main.Version }} ({{ .BuildInfo.Main.Sum }})</p>
+		{{ end }}
 	</section>
 </body>
 </html>

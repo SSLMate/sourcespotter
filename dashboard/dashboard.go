@@ -17,6 +17,7 @@ import (
 	"html/template"
 	"log"
 	"net/http"
+	"runtime/debug"
 	"time"
 
 	"software.sslmate.com/src/certspotter/merkletree"
@@ -86,6 +87,7 @@ type Dashboard struct {
 	SumDBs           []SumDB
 	InconsistentSTHs []InconsistentSTH
 	DuplicateRecords []DuplicateRecord
+	BuildInfo        *debug.BuildInfo
 }
 
 func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
@@ -138,6 +140,8 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 	`); err != nil {
 		return nil, err
 	}
+
+	dashboard.BuildInfo, _ = debug.ReadBuildInfo()
 
 	return dashboard, nil
 }
