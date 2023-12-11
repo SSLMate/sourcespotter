@@ -154,6 +154,7 @@ func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB, template *t
 	if err != nil {
 		log.Printf("error loading dashboard: %s", err)
 		http.Error(w, "Internal Database Error", 500)
+		return
 	}
 	w.Header().Set("Content-Type", "text/html")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
