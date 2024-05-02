@@ -15,7 +15,7 @@ import (
 	"fmt"
 	"io"
 	"log"
-	insecurerand "math/rand"
+	mathrand "math/rand/v2"
 	"net/http"
 	"time"
 )
@@ -179,7 +179,7 @@ func sendAllRecords(ctx context.Context, ch chan<- *Record, values []*Record) er
 }
 
 func randomSleep(ctx context.Context, minDuration time.Duration, maxDuration time.Duration) error {
-	duration := minDuration + time.Duration(insecurerand.Int63n(int64(maxDuration-minDuration)))
+	duration := minDuration + mathrand.N(maxDuration-minDuration)
 	timer := time.NewTimer(duration)
 	defer timer.Stop()
 	select {
