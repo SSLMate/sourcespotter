@@ -42,20 +42,11 @@ func splitRecords(input []byte) [][]byte {
 }
 
 func formatTileIndex(tile uint64) string {
-	str := ""
-	for {
-		rem := tile % 1000
-		tile = tile / 1000
-
-		if str == "" {
-			str = fmt.Sprintf("%03d", rem)
-		} else {
-			str = fmt.Sprintf("x%03d/%s", rem, str)
-		}
-
-		if tile == 0 {
-			break
-		}
+	const base = 1000
+	str := fmt.Sprintf("%03d", tile%base)
+	for tile >= base {
+		tile = tile / base
+		str = fmt.Sprintf("x%03d/%s", tile%base, str)
 	}
 	return str
 }
