@@ -33,7 +33,7 @@ type Record struct {
 
 func parseRecordHash(input string) ([]byte, error) {
 	if !strings.HasPrefix(input, sha256Prefix) {
-		return nil, errors.New("Unrecognized hash type")
+		return nil, errors.New("unrecognized hash type")
 	}
 	input = strings.TrimPrefix(input, sha256Prefix)
 	hash, err := base64.StdEncoding.DecodeString(input)
@@ -61,10 +61,10 @@ func ParseRecord(input []byte) (*Record, error) {
 	sourceLine, input := parseRecordLine(input)
 	gomodLine, input := parseRecordLine(input)
 	if sourceLine == nil || gomodLine == nil {
-		return nil, errors.New("Premature end of go.sum record")
+		return nil, errors.New("premature end of go.sum record")
 	}
 	if len(input) > 0 {
-		return nil, errors.New("Garbage at end of go.sum record")
+		return nil, errors.New("garbage at end of go.sum record")
 	}
 	if len(sourceLine) != 3 || len(gomodLine) != 3 {
 		return nil, errors.New("go.sum line does not have exactly three fields")
