@@ -24,7 +24,7 @@ import (
 func ServeGossip(address string, w http.ResponseWriter, req *http.Request, db *sql.DB) {
 	var sth sumdb.STH
 	var rootHash []byte
-	if err := db.QueryRowContext(req.Context(), `SELECT sth.tree_size, sth.root_hash, sth.signature FROM gosum.db JOIN gosum.sth ON sth.db_id = db.db_id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &rootHash, &sth.Signature); err != nil {
+	if err := db.QueryRowContext(req.Context(), `SELECT sth.tree_size, sth.root_hash, sth.signature FROM db JOIN sth ON sth.db_id = db.db_id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &rootHash, &sth.Signature); err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Go Checksum Database Not Found", 404)
 		} else {
@@ -52,7 +52,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 		sumdbid int32
 		key     []byte
 	)
-	if err := db.QueryRowContext(req.Context(), `SELECT db_id, key FROM gosum.db WHERE address = $1`, address).Scan(&sumdbid, &key); err != nil {
+	if err := db.QueryRowContext(req.Context(), `SELECT db_id, key FROM db WHERE address = $1`, address).Scan(&sumdbid, &key); err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Go Checksum Database Not Found", 404)
 		} else {
@@ -94,6 +94,6 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 }
 
 func isConsistent(ctx context.Context, db *sql.DB, sumdbid int32, sth *sumdb.STH) (consistent sql.NullBool, err error) {
-	err = db.QueryRowContext(ctx, `SELECT consistent FROM gosum.sth WHERE (db_id, tree_size, root_hash) = ($1, $2, $3)`, sumdbid, sth.TreeSize, sth.RootHash[:]).Scan(&consistent)
+	err = db.QueryRowContext(ctx, `SELECT consistent FROM sth WHERE (db_id, tree_size, root_hash) = ($1, $2, $3)`, sumdbid, sth.TreeSize, sth.RootHash[:]).Scan(&consistent)
 	return
 }

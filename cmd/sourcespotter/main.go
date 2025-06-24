@@ -33,7 +33,7 @@ const (
 	downloadSTHInterval = 1 * time.Minute
 	auditSTHInterval    = 15 * time.Minute * 10
 	ingestSleep         = 5 * time.Minute * 10
-	dbChannelName       = `gosum_events`
+	dbChannelName       = `events`
 )
 
 var (
@@ -192,7 +192,7 @@ func main() {
 	}
 
 	var enabledSumDBs []int32
-	if err := dbutil.QueryAll(context.Background(), db, &enabledSumDBs, `SELECT db_id FROM gosum.db WHERE enabled ORDER BY db_id`); err != nil {
+	if err := dbutil.QueryAll(context.Background(), db, &enabledSumDBs, `SELECT db_id FROM db WHERE enabled ORDER BY db_id`); err != nil {
 		log.Fatal(err)
 	}
 

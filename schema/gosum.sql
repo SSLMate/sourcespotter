@@ -9,9 +9,7 @@
 
 BEGIN;
 
-CREATE SCHEMA gosum;
-
-CREATE TABLE gosum.db (
+CREATE TABLE db (
 	db_id			serial NOT NULL,
 	address			text NOT NULL,
 	key			bytea NOT NULL,
@@ -20,19 +18,19 @@ CREATE TABLE gosum.db (
 	enabled			boolean NOT NULL DEFAULT TRUE,
 	PRIMARY KEY (db_id)
 );
-CREATE UNIQUE INDEX db_address ON gosum.db (address);
+CREATE UNIQUE INDEX db_address ON db (address);
 
-CREATE FUNCTION gosum.after_verified_position_update() RETURNS trigger AS $$
+CREATE FUNCTION after_verified_position_update() RETURNS trigger AS $$
 BEGIN
-	PERFORM pg_notify('gosum_events', jsonb_build_object('DBID', NEW.db_id, 'Event', 'new_position')::text);
+	PERFORM pg_notify('events', jsonb_build_object('DBID', NEW.db_id, 'Event', 'new_position')::text);
 	RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER verified_position_updated AFTER UPDATE OF verified_position ON gosum.db FOR EACH ROW EXECUTE PROCEDURE gosum.after_verified_position_update();
+CREATE TRIGGER verified_position_updated AFTER UPDATE OF verified_position ON db FOR EACH ROW EXECUTE PROCEDURE after_verified_position_update();
 
-CREATE TABLE gosum.sth (
+CREATE TABLE sth (
 	sth_id			bigserial NOT NULL,
-	db_id			int NOT NULL REFERENCES gosum.db,
+	db_id			int NOT NULL REFERENCES db,
 	tree_size		bigint NOT NULL,
 	root_hash		bytea NOT NULL,
 	signature		bytea NOT NULL,
@@ -42,34 +40,34 @@ CREATE TABLE gosum.sth (
 
 	PRIMARY KEY (sth_id)
 );
-CREATE UNIQUE INDEX sth_unique ON gosum.sth (db_id, tree_size, root_hash);
-CREATE INDEX sth_inconsistent ON gosum.sth (db_id) WHERE consistent = FALSE;
-CREATE INDEX sth_unverified ON gosum.sth (db_id, tree_size) WHERE consistent IS NULL;
+CREATE UNIQUE INDEX sth_unique ON sth (db_id, tree_size, root_hash);
+CREATE INDEX sth_inconsistent ON sth (db_id) WHERE consistent = FALSE;
+CREATE INDEX sth_unverified ON sth (db_id, tree_size) WHERE consistent IS NULL;
 
-CREATE FUNCTION gosum.before_sth_insert() RETURNS trigger AS $$
+CREATE FUNCTION before_sth_insert() RETURNS trigger AS $$
 BEGIN
 	CASE
 	WHEN NEW.tree_size = 0 THEN
 		NEW.consistent = (NEW.root_hash = '\xe3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855');
-	WHEN NEW.tree_size <= (SELECT (verified_position->>'size')::bigint FROM gosum.db WHERE db_id = NEW.db_id) THEN
-		NEW.consistent = (NEW.root_hash = (SELECT root_hash FROM gosum.record WHERE db_id = NEW.db_id AND position = (NEW.tree_size - 1)));
+	WHEN NEW.tree_size <= (SELECT (verified_position->>'size')::bigint FROM db WHERE db_id = NEW.db_id) THEN
+		NEW.consistent = (NEW.root_hash = (SELECT root_hash FROM record WHERE db_id = NEW.db_id AND position = (NEW.tree_size - 1)));
 	ELSE
 	END CASE;
 	RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER sth_insert BEFORE INSERT ON gosum.sth FOR EACH ROW EXECUTE PROCEDURE gosum.before_sth_insert();
+CREATE TRIGGER sth_insert BEFORE INSERT ON sth FOR EACH ROW EXECUTE PROCEDURE before_sth_insert();
 
-CREATE FUNCTION gosum.after_unverified_sth_insert() RETURNS trigger AS $$
+CREATE FUNCTION after_unverified_sth_insert() RETURNS trigger AS $$
 BEGIN
-	PERFORM pg_notify('gosum_events', jsonb_build_object('DBID', NEW.db_id, 'Event', 'new_sth')::text);
+	PERFORM pg_notify('events', jsonb_build_object('DBID', NEW.db_id, 'Event', 'new_sth')::text);
 	RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER unverified_sth_inserted AFTER INSERT ON gosum.sth FOR EACH ROW WHEN (NEW.consistent IS NULL) EXECUTE PROCEDURE gosum.after_unverified_sth_insert();
+CREATE TRIGGER unverified_sth_inserted AFTER INSERT ON sth FOR EACH ROW WHEN (NEW.consistent IS NULL) EXECUTE PROCEDURE after_unverified_sth_insert();
 
-CREATE TABLE gosum.record (
-	db_id			int NOT NULL REFERENCES gosum.db,
+CREATE TABLE record (
+	db_id			int NOT NULL REFERENCES db,
 	position		bigint NOT NULL,
 	module			text NOT NULL,
 	version			text NOT NULL,
@@ -80,15 +78,15 @@ CREATE TABLE gosum.record (
 	previous_position	bigint,
 	PRIMARY KEY (db_id, position)
 );
-CREATE INDEX record_module ON gosum.record (module, version, db_id, position DESC);
-CREATE INDEX duplicate_module ON gosum.record (db_id) WHERE previous_position IS NOT NULL;
+CREATE INDEX record_module ON record (module, version, db_id, position DESC);
+CREATE INDEX duplicate_module ON record (db_id) WHERE previous_position IS NOT NULL;
 
-CREATE FUNCTION gosum.before_record_insert() RETURNS trigger AS $$
+CREATE FUNCTION before_record_insert() RETURNS trigger AS $$
 BEGIN
-	NEW.previous_position = (SELECT position FROM gosum.record WHERE (module,version,db_id) = (NEW.module,NEW.version,NEW.db_id) ORDER BY position DESC LIMIT 1);
+	NEW.previous_position = (SELECT position FROM record WHERE (module,version,db_id) = (NEW.module,NEW.version,NEW.db_id) ORDER BY position DESC LIMIT 1);
 	RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
-CREATE TRIGGER record_insert BEFORE INSERT ON gosum.record FOR EACH ROW EXECUTE PROCEDURE gosum.before_record_insert();
+CREATE TRIGGER record_insert BEFORE INSERT ON record FOR EACH ROW EXECUTE PROCEDURE before_record_insert();
 
 COMMIT;

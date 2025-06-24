@@ -44,10 +44,10 @@ type ingestState struct {
 
 func loadIngestState(ctx context.Context, id int32, db *sql.DB) (*ingestState, error) {
 	state := &ingestState{id: id, db: db}
-	if err := db.QueryRowContext(ctx, `SELECT address, download_position FROM gosum.db WHERE db_id = $1`, id).Scan(&state.address, dbutil.JSON(&state.tree)); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT address, download_position FROM db WHERE db_id = $1`, id).Scan(&state.address, dbutil.JSON(&state.tree)); err != nil {
 		return nil, fmt.Errorf("error loading sumdb %d: %w", id, err)
 	}
-	if err := dbutil.QueryAll(ctx, db, &state.sths, `SELECT DISTINCT ON (tree_size) tree_size, root_hash FROM gosum.sth WHERE db_id = $1 AND tree_size > $2 ORDER BY tree_size, root_hash`, state.id, state.tree.Size()); err != nil {
+	if err := dbutil.QueryAll(ctx, db, &state.sths, `SELECT DISTINCT ON (tree_size) tree_size, root_hash FROM sth WHERE db_id = $1 AND tree_size > $2 ORDER BY tree_size, root_hash`, state.id, state.tree.Size()); err != nil {
 		return nil, fmt.Errorf("error loading next STHs for sumdb %d: %w", id, err)
 	}
 	if err := state.begin(ctx); err != nil {
@@ -75,14 +75,14 @@ func (state *ingestState) begin(ctx context.Context) error {
 		address string
 		tree    merkletree.CollapsedTree
 	)
-	if err := tx.QueryRowContext(ctx, `SELECT address, download_position FROM gosum.db WHERE db_id = $1 FOR UPDATE`, state.id).Scan(&address, dbutil.JSON(&tree)); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT address, download_position FROM db WHERE db_id = $1 FOR UPDATE`, state.id).Scan(&address, dbutil.JSON(&tree)); err != nil {
 		return fmt.Errorf("error reloading sumdb %d: %w", state.id, err)
 	}
 	if address != state.address || !tree.Equal(state.tree) {
 		return fmt.Errorf("sumdb %d has been modified by a different process", state.id)
 	}
 
-	stmt, err := tx.PrepareContext(ctx, pq.CopyInSchema("gosum", "record", "db_id", "position", "module", "version", "source_sha256", "gomod_sha256", "root_hash"))
+	stmt, err := tx.PrepareContext(ctx, pq.CopyIn("record", "db_id", "position", "module", "version", "source_sha256", "gomod_sha256", "root_hash"))
 	if err != nil {
 		return fmt.Errorf("error preparing COPY statement: %w", err)
 	}
@@ -106,11 +106,11 @@ func (state *ingestState) commit(ctx context.Context, verified bool) error {
 		return fmt.Errorf("error closing COPY statement: %w", err)
 	}
 	if verified {
-		if err := dbutil.MustAffectRow(state.tx.ExecContext(ctx, `UPDATE gosum.db SET download_position = $1, verified_position = $1 WHERE db_id = $2`, dbutil.JSON(state.tree), state.id)); err != nil {
+		if err := dbutil.MustAffectRow(state.tx.ExecContext(ctx, `UPDATE db SET download_position = $1, verified_position = $1 WHERE db_id = $2`, dbutil.JSON(state.tree), state.id)); err != nil {
 			return fmt.Errorf("error updating download and verified position: %w", err)
 		}
 	} else {
-		if err := dbutil.MustAffectRow(state.tx.ExecContext(ctx, `UPDATE gosum.db SET download_position = $1 WHERE db_id = $2`, dbutil.JSON(state.tree), state.id)); err != nil {
+		if err := dbutil.MustAffectRow(state.tx.ExecContext(ctx, `UPDATE db SET download_position = $1 WHERE db_id = $2`, dbutil.JSON(state.tree), state.id)); err != nil {
 			return fmt.Errorf("error updating download position: %w", err)
 		}
 	}

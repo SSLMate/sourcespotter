@@ -21,7 +21,7 @@ import (
 func Download(ctx context.Context, sumdbid int32, db *sql.DB) error {
 	var address string
 	var key []byte
-	if err := db.QueryRowContext(ctx, `SELECT address, key FROM gosum.db WHERE db_id = $1`, sumdbid).Scan(&address, &key); err != nil {
+	if err := db.QueryRowContext(ctx, `SELECT address, key FROM db WHERE db_id = $1`, sumdbid).Scan(&address, &key); err != nil {
 		return fmt.Errorf("error loading info for sumdb %d: %w", sumdbid, err)
 	}
 

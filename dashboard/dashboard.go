@@ -100,9 +100,9 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 			largest_sth.observed_at AS "LargestSTHTime",
 			db.download_position->>'size' AS "DownloadSize",
 			db.verified_position->>'size' AS "VerifiedSize"
-		FROM gosum.db
+		FROM db
 		LEFT JOIN LATERAL (
-			SELECT DISTINCT ON (db_id) * FROM gosum.sth ORDER BY db_id, tree_size DESC
+			SELECT DISTINCT ON (db_id) * FROM sth ORDER BY db_id, tree_size DESC
 		) largest_sth USING (db_id)
 		WHERE db.enabled
 		ORDER BY db.address
@@ -117,9 +117,9 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 			sth.root_hash AS "RootHash",
 			record.root_hash AS "CalculatedRootHash",
 			sth.signature AS "Signature"
-		FROM gosum.sth
-		JOIN gosum.db USING (db_id)
-		JOIN gosum.record ON (record.db_id, record.position) = (sth.db_id, sth.tree_size-1)
+		FROM sth
+		JOIN db USING (db_id)
+		JOIN record ON (record.db_id, record.position) = (sth.db_id, sth.tree_size-1)
 		WHERE sth.consistent = FALSE
 		ORDER BY sth.db_id, sth.tree_size, sth.root_hash
 	`); err != nil {
@@ -133,8 +133,8 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 			record.previous_position AS "PreviousPosition",
 			record.module AS "Module",
 			record.version AS "Version"
-		FROM gosum.record
-		JOIN gosum.db USING (db_id)
+		FROM record
+		JOIN db USING (db_id)
 		WHERE record.previous_position IS NOT NULL
 		ORDER BY (record.db_id, record.position)
 	`); err != nil {
