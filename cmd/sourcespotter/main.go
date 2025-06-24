@@ -25,6 +25,7 @@ import (
 	"src.agwa.name/go-dbutil"
 	"src.agwa.name/go-listener"
 	_ "src.agwa.name/go-listener/tls"
+	"src.agwa.name/go-util/logfilter"
 	"strings"
 	"time"
 )
@@ -207,6 +208,7 @@ func main() {
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  3 * time.Second,
 		Handler:      http.HandlerFunc(handleGossip),
+		ErrorLog:     logfilter.New(log.Default(), logfilter.HTTPServerErrors),
 	}
 
 	group, ctx := errgroup.WithContext(context.Background())

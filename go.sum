@@ -14,3 +14,5 @@ src.agwa.name/go-dbutil v0.8.0 h1:CXQMJq8R8uWQa7n1nFcFcNCp84gyBs4wcDZ7SJrVt2w=
 src.agwa.name/go-dbutil v0.8.0/go.mod h1:iOR0cJz/xOpAetjaSUCCnG/HUe4HJN9WAXMg+7aW844=
 src.agwa.name/go-listener v0.6.1 h1:L4A6jFsaI+Nevt/XpJTTxYvbo95qLzuavfXe1A3oB4A=
 src.agwa.name/go-listener v0.6.1/go.mod h1:vM7zjlskRnSbxbS8QTWYQIOfuKsn8SdJQH28RtouDTI=
+src.agwa.name/go-util v0.5.1 h1:CZb9UAWl96zUKVMPBYeeqqjc8kJnugbvE6NY8jYqBFs=
+src.agwa.name/go-util v0.5.1/go.mod h1:rBBXcnPOkNW/IgvXcGoHQxTUj9kIixAxoXCs8E6IJW4=
