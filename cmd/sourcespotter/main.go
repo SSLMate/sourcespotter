@@ -212,9 +212,6 @@ func main() {
 	}
 
 	group, ctx := errgroup.WithContext(context.Background())
-	group.Go(func() error {
-		return handleNotifications(ctx)
-	})
 	for _, id := range enabledSumDBs {
 		id := id
 		signals := makeSignals()
@@ -229,6 +226,9 @@ func main() {
 			return ingestRecords(ctx, id, signals.newSTH)
 		})
 	}
+	group.Go(func() error {
+		return handleNotifications(ctx)
+	})
 	for _, listener := range gossipListeners {
 		listener := listener
 		go func() {
