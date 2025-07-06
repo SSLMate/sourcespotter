@@ -70,19 +70,29 @@ func (s signal) raise() {
 }
 
 func downloadSTHs(ctx context.Context, id int32) error {
-	return periodically(ctx, downloadSTHInterval, nil, func() error {
-		return sths.Download(ctx, id, db)
-	})
+	for {
+		if err := sths.Download(ctx, id, db); err != nil {
+			return err
+		}
+		if err := sleep(ctx, downloadSTHInterval, nil); err != nil {
+			return err
+		}
+	}
 }
 
 func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{}) error {
-	return periodically(ctx, auditSTHInterval, newPositionSignal, func() error {
-		return sths.Audit(ctx, id, db)
-	})
+	for {
+		if err := sths.Audit(ctx, id, db); err != nil {
+			return err
+		}
+		if err := sleep(ctx, auditSTHInterval, newPositionSignal); err != nil {
+			return err
+		}
+	}
 }
 
 func ingestRecords(ctx context.Context, id int32, newSTHSignal <-chan struct{}) error {
-	for ctx.Err() == nil {
+	for {
 		if _, err := records.Ingest(ctx, id, db); err != nil {
 			return err
 		}
@@ -90,7 +100,6 @@ func ingestRecords(ctx context.Context, id int32, newSTHSignal <-chan struct{}) 
 			return err
 		}
 	}
-	return ctx.Err()
 }
 
 func handleNotifications(ctx context.Context) error {
@@ -213,7 +222,6 @@ func main() {
 
 	group, ctx := errgroup.WithContext(context.Background())
 	for _, id := range enabledSumDBs {
-		id := id
 		signals := makeSignals()
 		sumdbSignals[id] = signals
 		group.Go(func() error {
@@ -230,7 +238,6 @@ func main() {
 		return handleNotifications(ctx)
 	})
 	for _, listener := range gossipListeners {
-		listener := listener
 		go func() {
 			log.Fatal(gossipServer.Serve(listener))
 		}()
@@ -248,28 +255,5 @@ func sleep(ctx context.Context, duration time.Duration, wakeup <-chan struct{}) 
 		return nil
 	case <-wakeup:
 		return nil
-	}
-}
-
-func periodically(ctx context.Context, interval time.Duration, wakeup <-chan struct{}, f func() error) error {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-	if err := f(); err != nil {
-		return err
-	}
-	for {
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if err := f(); err != nil {
-				return err
-			}
-		case <-wakeup:
-			if err := f(); err != nil {
-				return err
-			}
-			ticker.Reset(interval)
-		}
 	}
 }
