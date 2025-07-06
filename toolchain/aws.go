@@ -1,6 +1,8 @@
 package toolchain
 
 import (
+	"context"
+	"io"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -36,4 +38,39 @@ func toolchainObjectName(modversion string) string {
 
 func logObjectName(modversion string) string {
 	return "log/" + modversion + "@" + time.Now().UTC().Format(time.RFC3339)
+}
+
+func presignPutObject(ctx context.Context, objectName string) (string, error) {
+	presigner := s3.NewPresignClient(newS3Client())
+	presigned, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(objectName),
+	}, s3.WithPresignExpires(30*time.Minute))
+	if err != nil {
+		return "", err
+	}
+	return presigned.URL, nil
+}
+
+func presignGetObject(ctx context.Context, objectName string) (string, error) {
+	presigner := s3.NewPresignClient(newS3Client())
+	presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(objectName),
+	}, s3.WithPresignExpires(30*time.Minute))
+	if err != nil {
+		return "", err
+	}
+	return presigned.URL, nil
+}
+
+func getObject(ctx context.Context, objectName string) (io.ReadCloser, error) {
+	out, err := newS3Client().GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(objectName),
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out.Body, nil
 }

@@ -27,7 +27,7 @@ import (
 	"src.agwa.name/go-dbutil"
 )
 
-func download(ctx context.Context, getURL string) ([]byte, error) {
+func download(ctx context.Context, getURL string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
 	if err != nil {
 		return nil, err
@@ -36,17 +36,23 @@ func download(ctx context.Context, getURL string) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-
 	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
 		return nil, &url.Error{Op: "Get", URL: getURL, Err: errors.New(resp.Status)}
 	}
+	return resp.Body, nil
+}
 
-	data, err := io.ReadAll(resp.Body)
+func downloadBytes(ctx context.Context, getURL string) ([]byte, error) {
+	r, err := download(ctx, getURL)
+	if err != nil {
+		return nil, err
+	}
+	defer r.Close()
+	data, err := io.ReadAll(r)
 	if err != nil {
 		return nil, &url.Error{Op: "Get", URL: getURL, Err: err}
 	}
-
 	return data, nil
 }
 
@@ -54,7 +60,7 @@ func saveSource(ctx context.Context, goversion string, url string) ([]byte, erro
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(60*time.Second))
 	defer cancel()
 
-	source, err := download(ctx, url)
+	source, err := downloadBytes(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -105,14 +111,10 @@ func SaveSource(ctx context.Context, db *sql.DB, goversion string) (string, erro
 		return "", fmt.Errorf("error committing database transaction: %w", err)
 	}
 
-	presigner := s3.NewPresignClient(newS3Client())
-	presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(S3Bucket),
-		Key:    aws.String(sourceObjectName(goversion)),
-	}, s3.WithPresignExpires(24*time.Hour))
+	presignedURL, err := presignGetObject(ctx, sourceObjectName(goversion))
 	if err != nil {
 		return "", fmt.Errorf("error presigning source download: %w", err)
 	}
 
-	return presigned.URL, nil
+	return presignedURL, nil
 }

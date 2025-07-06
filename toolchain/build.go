@@ -20,12 +20,10 @@ import (
 	"log"
 	"os"
 	"slices"
-	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"golang.org/x/mod/semver"
 	"golang.org/x/mod/sumdb/dirhash"
 	"golang.org/x/sync/errgroup"
@@ -112,19 +110,15 @@ func Build(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 	}
 
 	bootstrapVersion := toolchain.BootstrapToolchain(version.GoVersion)
-	presigner := s3.NewPresignClient(newS3Client())
 	for bootstrapVersion != "" {
 		if toolchain.IsReproducible(bootstrapVersion) {
 			modVersion := toolchain.Version{GoVersion: bootstrapVersion, GOOS: "linux", GOARCH: LambdaArch}.ModVersion()
 			obj := toolchainObjectName(modVersion)
-			presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
-				Bucket: aws.String(S3Bucket),
-				Key:    aws.String(obj),
-			}, s3.WithPresignExpires(24*time.Hour))
-			if err != nil {
+			if url, err := presignGetObject(ctx, obj); err != nil {
 				return fmt.Errorf("error presigning bootstrap toolchain: %w", err)
+			} else {
+				lambdaInput.ToolchainURLs[modVersion] = url
 			}
-			lambdaInput.ToolchainURLs[modVersion] = presigned.URL
 			break
 		}
 		if url, err := SaveSource(ctx, db, bootstrapVersion); err != nil {
@@ -135,25 +129,22 @@ func Build(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 		bootstrapVersion = toolchain.BootstrapToolchain(bootstrapVersion)
 	}
 
-	obj := toolchainObjectName(version.ModVersion())
-	presigned, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(S3Bucket),
-		Key:    aws.String(obj),
-	}, s3.WithPresignExpires(24*time.Hour))
-	if err != nil {
-		return fmt.Errorf("error presigning zip upload: %w", err)
-	}
-	lambdaInput.ZipUploadURL = presigned.URL
+	var (
+		zipObj = toolchainObjectName(version.ModVersion())
+		logObj = logObjectName(version.ModVersion())
+	)
 
-	logObj := logObjectName(version.ModVersion())
-	presignedLog, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(S3Bucket),
-		Key:    aws.String(logObj),
-	}, s3.WithPresignExpires(24*time.Hour))
-	if err != nil {
-		return fmt.Errorf("error presigning log upload: %w", err)
+	if url, err := presignPutObject(ctx, zipObj); err != nil {
+		return fmt.Errorf("error presigning zip upload: %w", err)
+	} else {
+		lambdaInput.ZipUploadURL = url
 	}
-	lambdaInput.LogUploadURL = presignedLog.URL
+
+	if url, err := presignPutObject(ctx, logObj); err != nil {
+		return fmt.Errorf("error presigning log upload: %w", err)
+	} else {
+		lambdaInput.LogUploadURL = url
+	}
 
 	payload, err := json.Marshal(lambdaInput)
 	if err != nil {
@@ -162,69 +153,69 @@ func Build(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 
 	log.Printf("invoking lambda %s for %s.%s-%s", LambdaFunc, version.GoVersion, version.GOOS, version.GOARCH)
 	start := time.Now()
-	out, err := newLambdaClient().Invoke(ctx, &lambda.InvokeInput{
+	lambdaResult, err := newLambdaClient().Invoke(ctx, &lambda.InvokeInput{
 		FunctionName: aws.String(LambdaFunc),
 		Payload:      payload,
 	})
 	duration := time.Since(start)
-	if err != nil {
-		return storeBuildResult(ctx, db, modversion, &buildResult{
-			Status:        buildFailed,
-			Message:       sqlString(err.Error()),
-			BuildDuration: sqlInterval(duration),
-			LogFile:       sqlString(logObj),
-		})
-	}
-	if out.FunctionError != nil {
-		return storeBuildResult(ctx, db, modversion, &buildResult{
-			Status:        buildFailed,
-			Message:       sqlString(string(out.Payload)),
-			BuildDuration: sqlInterval(duration),
-			LogFile:       sqlString(logObj),
-		})
-	}
-
-	tmpf, err := os.CreateTemp("", "download-*")
-	if err != nil {
-		return fmt.Errorf("error creating temp file: %w", err)
-	}
-	defer os.Remove(tmpf.Name())
-	defer tmpf.Close()
-
-	s3client := newS3Client()
-	getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(S3Bucket),
-		Key:    aws.String(obj),
-	})
-	if err != nil {
-		return fmt.Errorf("error downloading built toolchain: %w", err)
-	}
-	defer getOut.Body.Close()
-	if _, err := io.Copy(tmpf, getOut.Body); err != nil {
-		return fmt.Errorf("error saving built toolchain: %w", err)
-	}
-	if err := tmpf.Close(); err != nil {
-		return fmt.Errorf("error saving built toolchain: %w", err)
-	}
-
-	hashStr, err := dirhash.HashZip(tmpf.Name(), dirhash.Hash1)
-	if err != nil {
-		return fmt.Errorf("error hashing built toolchain: %w", err)
-	}
-	hb, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(hashStr, "h1:"))
-	if err != nil {
-		return fmt.Errorf("error decoding hash: %w", err)
-	}
-	status := buildEqual
-	if !bytes.Equal(hb, expectedSHA256) {
-		status = buildUnequal
-	}
-
-	return storeBuildResult(ctx, db, modversion, &buildResult{
-		Status:        status,
+	result := &buildResult{
 		BuildDuration: sqlInterval(duration),
 		LogFile:       sqlString(logObj),
-	})
+	}
+	if err != nil {
+		result.Status = buildFailed
+		result.Message = sqlString(err.Error())
+	} else if lambdaResult.FunctionError != nil {
+		result.Status = buildFailed
+		result.Message = sqlString(string(lambdaResult.Payload))
+	} else if isEqual, err := compare(ctx, version, expectedSHA256); err != nil {
+		result.Status = buildFailed
+		result.Message = sqlString(err.Error())
+	} else if isEqual {
+		result.Status = buildEqual
+	} else {
+		result.Status = buildUnequal
+	}
+	return storeBuildResult(ctx, db, modversion, result)
+}
+
+func compare(ctx context.Context, version toolchain.Version, expectedSHA256 []byte) (bool, error) {
+	toolchainReader, err := getObject(ctx, toolchainObjectName(version.ModVersion()))
+	if err != nil {
+		return false, fmt.Errorf("error downloading built toolchain: %w", err)
+	}
+	toolchainFilename, err := downloadToTempFile(toolchainReader)
+	if err != nil {
+		return false, fmt.Errorf("error saving built toolchain: %w", err)
+	}
+	defer os.Remove(toolchainFilename)
+
+	gotHash, err := dirhash.HashZip(toolchainFilename, dirhash.Hash1)
+	if err != nil {
+		return false, fmt.Errorf("error hashing built toolchain: %w", err)
+	}
+	return gotHash == "h1:"+base64.StdEncoding.EncodeToString(expectedSHA256), nil
+}
+
+func downloadToTempFile(r io.ReadCloser) (filename string, retErr error) {
+	defer r.Close()
+	f, err := os.CreateTemp("", "download")
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		f.Close()
+		if retErr != nil {
+			os.Remove(f.Name())
+		}
+	}()
+	if _, err := io.Copy(f, r); err != nil {
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
 }
 
 type buildStatus string
