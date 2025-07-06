@@ -51,4 +51,31 @@ CREATE TABLE record (
 CREATE INDEX record_module ON record (module, version, db_id, position DESC);
 CREATE INDEX duplicate_module ON record (db_id) WHERE previous_position IS NOT NULL;
 
+CREATE TYPE toolchain_build_status AS ENUM (
+	'skipped',
+	'equal',
+	'unequal',
+	'failed'
+);
+
+CREATE TABLE toolchain_build (
+	version		text NOT NULL, -- e.g. "v0.0.1-go1.21.0.linux-amd64"
+	inserted_at	timestamptz NOT NULL DEFAULT statement_timestamp(),
+	status		toolchain_build_status NOT NULL,
+	message		text,
+	log_file	text,
+	build_duration	interval,
+
+	PRIMARY KEY (version)
+);
+
+CREATE TABLE toolchain_source (
+	version		text NOT NULL, -- e.g. "go1.21.0"
+	url		text NOT NULL,
+	sha256		bytea,
+	downloaded_at	timestamptz NOT NULL DEFAULT statement_timestamp(),
+
+	PRIMARY KEY (version)
+);
+
 COMMIT;
