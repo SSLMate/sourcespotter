@@ -10,16 +10,20 @@
 package toolchain
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"database/sql"
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"src.agwa.name/go-dbutil"
 )
 
@@ -56,7 +60,16 @@ func saveSource(ctx context.Context, goversion string, url string) ([]byte, erro
 	}
 	sum := sha256.Sum256(source)
 
-	// TODO: PUT to S3 bucket at sourceObjectName(goversion)
+	client := newS3Client()
+	key := sourceObjectName(goversion)
+	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(key),
+		Body:   bytes.NewReader(source),
+	}); err != nil {
+		return nil, err
+	}
+	log.Printf("saved Go source %s to S3 bucket %s", goversion, S3Bucket)
 
 	return sum[:], nil
 }
@@ -92,7 +105,14 @@ func SaveSource(ctx context.Context, db *sql.DB, goversion string) (string, erro
 		return "", fmt.Errorf("error committing database transaction: %w", err)
 	}
 
-	// TODO: generate a pre-signed URL to GET sourceObjectName(goversion) from S3 bucket and return it as first return value
+	presigner := s3.NewPresignClient(newS3Client())
+	presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(sourceObjectName(goversion)),
+	}, s3.WithPresignExpires(24*time.Hour))
+	if err != nil {
+		return "", fmt.Errorf("error presigning source download: %w", err)
+	}
 
-	return "", nil
+	return presigned.URL, nil
 }

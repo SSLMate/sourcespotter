@@ -13,14 +13,24 @@ import (
 	"bytes"
 	"context"
 	"database/sql"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"io"
+	"log"
+	"os"
 	"slices"
+	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/lambda"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"golang.org/x/mod/semver"
+	"golang.org/x/mod/sumdb/dirhash"
 	"golang.org/x/sync/errgroup"
-	"src.agwa.name/go-dbutil"
 	"software.sslmate.com/src/sourcespotter/toolchain/toolchain"
+	"src.agwa.name/go-dbutil"
 )
 
 func BuildAll(ctx context.Context, db *sql.DB) error {
@@ -102,11 +112,19 @@ func Build(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 	}
 
 	bootstrapVersion := toolchain.BootstrapToolchain(version.GoVersion)
+	presigner := s3.NewPresignClient(newS3Client())
 	for bootstrapVersion != "" {
 		if toolchain.IsReproducible(bootstrapVersion) {
 			modVersion := toolchain.Version{GoVersion: bootstrapVersion, GOOS: "linux", GOARCH: LambdaArch}.ModVersion()
-			zipURL := "" // TODO: create a pre-signed URL to GET toolchain/{modVersion}.zip from S3 bucket, assign to zipURL
-			lambdaInput.ToolchainURLs[modVersion] = zipURL
+			obj := toolchainObjectName(modVersion)
+			presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
+				Bucket: aws.String(S3Bucket),
+				Key:    aws.String(obj),
+			}, s3.WithPresignExpires(24*time.Hour))
+			if err != nil {
+				return fmt.Errorf("error presigning bootstrap toolchain: %w", err)
+			}
+			lambdaInput.ToolchainURLs[modVersion] = presigned.URL
 			break
 		}
 		if url, err := SaveSource(ctx, db, bootstrapVersion); err != nil {
@@ -117,13 +135,96 @@ func Build(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 		bootstrapVersion = toolchain.BootstrapToolchain(bootstrapVersion)
 	}
 
-	// TODO: create pre-signed S3 URL to PUT toolchain/{version.ModVersion()}.zip to S3, assign to lambdaInput.ZipUploadURL
-	// TODO: create pre-signed S3 URL to PUT log/{version.ModVersion()}@{time.Now().UTC().Format(time.RFC3339)} to S3, assign to lambdaInput.LogUploadURL
-	// TODO: launch lambda to build the toolchain, passing it lambdaInput as the event
-	// TODO: if lambda was successful, download toolchain/{version.ModVersion()}.zip to a temporary file and hash it using dirhash.HashZip(zipfile, dirhash.Hash1) from golang.org/x/mod/sumdb/dirhash package and compare the hash against expectedSHA256
-	// TODO: call storeBuildResult
+	obj := toolchainObjectName(version.ModVersion())
+	presigned, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(obj),
+	}, s3.WithPresignExpires(24*time.Hour))
+	if err != nil {
+		return fmt.Errorf("error presigning zip upload: %w", err)
+	}
+	lambdaInput.ZipUploadURL = presigned.URL
 
-	return nil
+	logObj := logObjectName(version.ModVersion())
+	presignedLog, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(logObj),
+	}, s3.WithPresignExpires(24*time.Hour))
+	if err != nil {
+		return fmt.Errorf("error presigning log upload: %w", err)
+	}
+	lambdaInput.LogUploadURL = presignedLog.URL
+
+	payload, err := json.Marshal(lambdaInput)
+	if err != nil {
+		return fmt.Errorf("error encoding lambda payload: %w", err)
+	}
+
+	log.Printf("invoking lambda %s for %s.%s-%s", LambdaFunc, version.GoVersion, version.GOOS, version.GOARCH)
+	start := time.Now()
+	out, err := newLambdaClient().Invoke(ctx, &lambda.InvokeInput{
+		FunctionName: aws.String(LambdaFunc),
+		Payload:      payload,
+	})
+	duration := time.Since(start)
+	if err != nil {
+		return storeBuildResult(ctx, db, modversion, &buildResult{
+			Status:        buildFailed,
+			Message:       sqlString(err.Error()),
+			BuildDuration: sqlInterval(duration),
+			LogFile:       sqlString(logObj),
+		})
+	}
+	if out.FunctionError != nil {
+		return storeBuildResult(ctx, db, modversion, &buildResult{
+			Status:        buildFailed,
+			Message:       sqlString(string(out.Payload)),
+			BuildDuration: sqlInterval(duration),
+			LogFile:       sqlString(logObj),
+		})
+	}
+
+	tmpf, err := os.CreateTemp("", "download-*")
+	if err != nil {
+		return fmt.Errorf("error creating temp file: %w", err)
+	}
+	defer os.Remove(tmpf.Name())
+	defer tmpf.Close()
+
+	s3client := newS3Client()
+	getOut, err := s3client.GetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(obj),
+	})
+	if err != nil {
+		return fmt.Errorf("error downloading built toolchain: %w", err)
+	}
+	defer getOut.Body.Close()
+	if _, err := io.Copy(tmpf, getOut.Body); err != nil {
+		return fmt.Errorf("error saving built toolchain: %w", err)
+	}
+	if err := tmpf.Close(); err != nil {
+		return fmt.Errorf("error saving built toolchain: %w", err)
+	}
+
+	hashStr, err := dirhash.HashZip(tmpf.Name(), dirhash.Hash1)
+	if err != nil {
+		return fmt.Errorf("error hashing built toolchain: %w", err)
+	}
+	hb, err := base64.StdEncoding.DecodeString(strings.TrimPrefix(hashStr, "h1:"))
+	if err != nil {
+		return fmt.Errorf("error decoding hash: %w", err)
+	}
+	status := buildEqual
+	if !bytes.Equal(hb, expectedSHA256) {
+		status = buildUnequal
+	}
+
+	return storeBuildResult(ctx, db, modversion, &buildResult{
+		Status:        status,
+		BuildDuration: sqlInterval(duration),
+		LogFile:       sqlString(logObj),
+	})
 }
 
 type buildStatus string
