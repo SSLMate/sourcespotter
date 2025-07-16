@@ -53,11 +53,15 @@ func (b *BuildInput) build(ctx context.Context) (string, error) {
 	}
 
 	b.logf("Building %s using %q...", b.Version.GoVersion, gorootBootstrap)
-	if err := b.buildSource(ctx, goroot, []string{"-distpack"}, []string{
+	env := []string{
 		"GOROOT_BOOTSTRAP=" + gorootBootstrap,
 		"GOOS=" + b.Version.GOOS,
 		"GOARCH=" + b.Version.GOARCH,
-	}); err != nil {
+	}
+	if b.Version.GOOS == "linux" && b.Version.GOARCH == "arm" {
+		env = append(env, "GOARM=6")
+	}
+	if err := b.buildSource(ctx, goroot, []string{"-distpack"}, env); err != nil {
 		return "", fmt.Errorf("error building source for %s: %w", b.Version.GoVersion, err)
 	}
 	zippath := filepath.Join(goroot, "pkg", "distpack", b.Version.ZipFilename())
