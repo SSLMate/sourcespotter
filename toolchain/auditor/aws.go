@@ -7,7 +7,7 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
-package toolchain
+package auditor
 
 import (
 	"context"

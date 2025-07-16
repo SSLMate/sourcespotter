@@ -1,231 +1,212 @@
-// Copyright (C) 2025 Opsmate, Inc.
-//
-// This Source Code Form is subject to the terms of the Mozilla
-// Public License, v. 2.0. If a copy of the MPL was not distributed
-// with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
-//
-// This software is distributed WITHOUT A WARRANTY OF ANY KIND.
-// See the Mozilla Public License for details.
-
+// Package toolchain contains functions for building a Go toolchain
 package toolchain
 
 import (
+	"archive/tar"
+	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
-	"database/sql"
-	"encoding/base64"
-	"encoding/json"
 	"fmt"
-	"log"
+	"io"
+	"io/fs"
 	"os"
-	"slices"
-	"time"
-
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/lambda"
-	"golang.org/x/mod/semver"
-	"golang.org/x/mod/sumdb/dirhash"
-	"golang.org/x/sync/errgroup"
-	"software.sslmate.com/src/sourcespotter/toolchain/toolchain"
-	"src.agwa.name/go-dbutil"
+	"os/exec"
+	"path"
+	"path/filepath"
+	"runtime"
+	"strings"
 )
 
-func BuildAll(ctx context.Context, db *sql.DB) error {
-	g, ctx := errgroup.WithContext(ctx)
-	g.SetLimit(10)
-	g.Go(func() error {
-		type toolchainModule struct {
-			Version string `sql:"version"` // e.g. "v0.0.1-go1.21.0.linux-amd64"
-			SHA256  []byte `sql:"source_sha256"`
-		}
-		var toolchains []toolchainModule
-		if err := dbutil.QueryAll(ctx, db, &toolchains, `SELECT version, source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND NOT(EXISTS(SELECT 1 FROM toolchain_build WHERE toolchain_build.version = record.version))`); err != nil {
-			return fmt.Errorf("error querying unbuilt toolchains: %w", err)
-		}
-		slices.SortFunc(toolchains, func(a, b toolchainModule) int { return semver.Compare(a.Version, b.Version) })
+type BuildInput struct {
+	// WorkDir is the path to an empty directory in which to do work
+	WorkDir string
 
-		for i := 0; i < len(toolchains); {
-			var (
-				version = toolchains[i].Version
-				sha256  = toolchains[i].SHA256
-			)
-			i++
-			inconsistent := false
-			for i < len(toolchains) && toolchains[i].Version == version {
-				if !bytes.Equal(toolchains[i].SHA256, sha256) {
-					inconsistent = true
-				}
-				i++
-			}
-			if inconsistent {
-				return storeBuildResult(ctx, db, version, &buildResult{
-					Status:  buildFailed,
-					Message: sqlString("sumdb contains more than one checksum for this toolchain"),
-				})
-			}
-			g.Go(func() error {
-				if err := Build(ctx, db, version, sha256); err != nil {
-					return fmt.Errorf("error building %s: %w", version, err)
-				}
-				return nil
-			})
-		}
-		return nil
-	})
-	return g.Wait()
+	// Version is the version of the toolchain to build
+	Version Version
+
+	// GetSource returns the source tar.gz file for the given Go version, e.g. "go1.24.4"
+	GetSource func(context.Context, string) (io.ReadCloser, error)
+
+	// GetToolchain, if non-nil, returns a pre-built toolchain zip file for the given version, or nil, nil if a pre-built toolchain is not available
+	GetToolchain func(context.Context, Version) (io.ReadCloser, error)
+
+	// Log, if non-nil, receives the output the build scripts
+	Log io.Writer
 }
 
-func Build(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []byte) error {
-	type lambdaInputType struct {
-		Version       toolchain.Version
-		SourceURLs    map[string]string
-		ToolchainURLs map[string]string
-		ZipUploadURL  string
-		LogUploadURL  string
-	}
-	version, ok := toolchain.ParseModVersion(modversion)
-	if !ok {
-		return storeBuildResult(ctx, db, modversion, &buildResult{
-			Status:  buildFailed,
-			Message: sqlString("unable to parse module version"),
-		})
-	}
-	if !toolchain.IsReproducible(version.GoVersion) {
-		return storeBuildResult(ctx, db, modversion, &buildResult{
-			Status:  buildSkipped,
-			Message: sqlString("this version of Go is not reproducible"),
-		})
-	}
-	lambdaInput := &lambdaInputType{
-		Version:       version,
-		SourceURLs:    make(map[string]string),
-		ToolchainURLs: make(map[string]string),
+// Build builds a Go toolchain and returns the path to the module zip file, which will be under input.WorkDir. Build will retrieve or build other toolchains (using input.GetToolchain and input.GetSource) as necessary for bootstrapping.
+func Build(ctx context.Context, input *BuildInput) (string, error) {
+	return input.build(ctx)
+}
+
+func (b *BuildInput) build(ctx context.Context) (string, error) {
+	gorootBootstrap, err := b.prepareBootstrap(ctx, b.Version.GoVersion)
+	if err != nil {
+		return "", err
 	}
 
-	if url, err := SaveSource(ctx, db, version.GoVersion); err != nil {
-		return fmt.Errorf("error saving source code: %w", err)
-	} else {
-		lambdaInput.SourceURLs[version.GoVersion] = url
+	b.logf("Getting source for %s...", b.Version.GoVersion)
+	goroot := filepath.Join(b.WorkDir, "goroot")
+	if err := b.getSource(ctx, b.Version.GoVersion, goroot); err != nil {
+		return "", fmt.Errorf("error getting source for %s: %w", b.Version.GoVersion, err)
 	}
 
-	bootstrapVersion := toolchain.BootstrapToolchain(version.GoVersion)
-	for bootstrapVersion != "" {
-		if toolchain.IsReproducible(bootstrapVersion) {
-			modVersion := toolchain.Version{GoVersion: bootstrapVersion, GOOS: "linux", GOARCH: LambdaArch}.ModVersion()
-			obj := toolchainObjectName(modVersion)
-			if url, err := presignGetObject(ctx, obj); err != nil {
-				return fmt.Errorf("error presigning bootstrap toolchain: %w", err)
-			} else {
-				lambdaInput.ToolchainURLs[modVersion] = url
-			}
+	b.logf("Building %s using %q...", b.Version.GoVersion, gorootBootstrap)
+	if err := b.buildSource(ctx, goroot, []string{"-distpack"}, []string{
+		"GOROOT_BOOTSTRAP=" + gorootBootstrap,
+		"GOOS=" + b.Version.GOOS,
+		"GOARCH=" + b.Version.GOARCH,
+	}); err != nil {
+		return "", fmt.Errorf("error building source for %s: %w", b.Version.GoVersion, err)
+	}
+	zippath := filepath.Join(goroot, "pkg", "distpack", b.Version.ZipFilename())
+	return zippath, nil
+}
+
+func (b *BuildInput) prepareBootstrap(ctx context.Context, goversion string) (string, error) {
+	bootstrapVersion := BootstrapToolchain(goversion)
+	if bootstrapVersion == "" {
+		// only need C compiler
+		return "", nil
+	}
+
+	// see if there is a pre-built toolchain for bootstrapVersion
+	if gorootBootstrap, err := b.installBootstrapToolchain(ctx, bootstrapVersion); err != nil {
+		return "", fmt.Errorf("error installing bootstrap toolchain %s: %w", bootstrapVersion, err)
+	} else if gorootBootstrap != "" {
+		return gorootBootstrap, nil
+	}
+
+	// no pre-built toolchain; need to build bootstrapVersion from source
+	gorootBootstrap2, err := b.prepareBootstrap(ctx, bootstrapVersion)
+	if err != nil {
+		return "", err
+	}
+
+	b.logf("Building %s using %q...", bootstrapVersion, gorootBootstrap2)
+	gorootBootstrap := filepath.Join(b.WorkDir, bootstrapVersion)
+	if err := b.getSource(ctx, bootstrapVersion, gorootBootstrap); err != nil {
+		return "", fmt.Errorf("error getting source for %s: %w", bootstrapVersion, err)
+	}
+	if err := b.buildSource(ctx, gorootBootstrap, nil, []string{
+		"GOROOT_BOOTSTRAP=" + gorootBootstrap2,
+	}); err != nil {
+		return "", fmt.Errorf("error building source for %s (using %q for bootstrap): %w", bootstrapVersion, gorootBootstrap2, err)
+	}
+	return gorootBootstrap, nil
+}
+
+func (b *BuildInput) installBootstrapToolchain(ctx context.Context, bootstrapVersion string) (string, error) {
+	version := Version{GoVersion: bootstrapVersion, GOOS: runtime.GOOS, GOARCH: runtime.GOARCH}
+	zipBytes, err := b.getToolchain(ctx, version)
+	if err != nil {
+		return "", fmt.Errorf("error downloading bootstrap toolchain: %w", err)
+	} else if zipBytes == nil {
+		return "", nil
+	}
+	b.logf("Installing %s to use for bootstrap...", version.ModVersion())
+	zipReader, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
+	if err != nil {
+		return "", fmt.Errorf("error reading bootstrap toolchain zip: %w", err)
+	}
+	fsys, err := fs.Sub(zipReader, "golang.org/toolchain@"+version.ModVersion())
+	if err != nil {
+		return "", fmt.Errorf("error making bootstrap toolchain filesystem: %w", err)
+	}
+	bootstrapDir := filepath.Join(b.WorkDir, bootstrapVersion)
+	if err := os.CopyFS(bootstrapDir, fsys); err != nil {
+		return "", fmt.Errorf("error unzipping bootstrap toolchain: %w", err)
+	}
+	return bootstrapDir, nil
+}
+
+func (b *BuildInput) getSource(ctx context.Context, goVersion string, destDir string) error {
+	f, err := b.GetSource(ctx, goVersion)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	gz, err := gzip.NewReader(f)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
 			break
 		}
-		if url, err := SaveSource(ctx, db, bootstrapVersion); err != nil {
-			return fmt.Errorf("error saving source code for %s (needed for bootstrap): %w", bootstrapVersion, err)
-		} else {
-			lambdaInput.SourceURLs[bootstrapVersion] = url
+		if err != nil {
+			return err
 		}
-		bootstrapVersion = toolchain.BootstrapToolchain(bootstrapVersion)
-	}
-
-	var (
-		zipObj = toolchainObjectName(version.ModVersion())
-		logObj = logObjectName(version.ModVersion())
-	)
-
-	if url, err := presignPutObject(ctx, zipObj); err != nil {
-		return fmt.Errorf("error presigning zip upload: %w", err)
-	} else {
-		lambdaInput.ZipUploadURL = url
-	}
-
-	if url, err := presignPutObject(ctx, logObj); err != nil {
-		return fmt.Errorf("error presigning log upload: %w", err)
-	} else {
-		lambdaInput.LogUploadURL = url
-	}
-
-	payload, err := json.Marshal(lambdaInput)
-	if err != nil {
-		return fmt.Errorf("error encoding lambda payload: %w", err)
-	}
-
-	log.Printf("invoking lambda %s for %s.%s-%s", LambdaFunc, version.GoVersion, version.GOOS, version.GOARCH)
-	start := time.Now()
-	lambdaResult, err := newLambdaClient().Invoke(ctx, &lambda.InvokeInput{
-		FunctionName: aws.String(LambdaFunc),
-		Payload:      payload,
-	})
-	duration := time.Since(start)
-	result := &buildResult{
-		BuildDuration: sqlInterval(duration),
-		LogFile:       sqlString(logObj),
-	}
-	if err != nil {
-		result.Status = buildFailed
-		result.Message = sqlString(err.Error())
-	} else if lambdaResult.FunctionError != nil {
-		result.Status = buildFailed
-		result.Message = sqlString(string(lambdaResult.Payload))
-	} else if isEqual, err := compare(ctx, version, expectedSHA256); err != nil {
-		result.Status = buildFailed
-		result.Message = sqlString(err.Error())
-	} else if isEqual {
-		result.Status = buildEqual
-	} else {
-		result.Status = buildUnequal
-	}
-	return storeBuildResult(ctx, db, modversion, result)
-}
-
-func compare(ctx context.Context, version toolchain.Version, expectedSHA256 []byte) (bool, error) {
-	toolchainReader, err := getObject(ctx, toolchainObjectName(version.ModVersion()))
-	if err != nil {
-		return false, fmt.Errorf("error downloading built toolchain: %w", err)
-	}
-	toolchainFilename, err := copyToTempFile(toolchainReader)
-	if err != nil {
-		return false, fmt.Errorf("error saving built toolchain: %w", err)
-	}
-	defer os.Remove(toolchainFilename)
-
-	gotHash, err := dirhash.HashZip(toolchainFilename, dirhash.Hash1)
-	if err != nil {
-		return false, fmt.Errorf("error hashing built toolchain: %w", err)
-	}
-	return gotHash == "h1:"+base64.StdEncoding.EncodeToString(expectedSHA256), nil
-}
-
-type buildStatus string
-
-const (
-	buildSkipped buildStatus = "skipped"
-	buildEqual   buildStatus = "equal"
-	buildUnequal buildStatus = "unequal"
-	buildFailed  buildStatus = "failed"
-)
-
-type buildResult struct {
-	Status        buildStatus
-	Message       sql.NullString
-	LogFile       sql.NullString
-	BuildDuration sql.NullString
-}
-
-func storeBuildResult(ctx context.Context, db *sql.DB, modversion string, result *buildResult) error {
-	_, err := db.ExecContext(ctx, `
-		INSERT INTO toolchain_build (version, status, message, log_file, build_duration)
-		VALUES ($1, $2, $3, $4, $5)
-		ON CONFLICT (version)
-		DO UPDATE SET
-			inserted_at = EXCLUDED.inserted_at,
-			status = EXCLUDED.status,
-			message = EXCLUDED.message,
-			log_file = EXCLUDED.log_file,
-			build_duration = EXCLUDED.build_duration
-	`, modversion, result.Status, result.Message, result.LogFile, result.BuildDuration)
-	if err != nil {
-		return fmt.Errorf("error storing %s build result for %q: %w", result.Status, modversion, err)
+		filename := path.Clean(hdr.Name)
+		filename, ok := strings.CutPrefix(filename, "go/")
+		if !ok {
+			continue
+		}
+		target := filepath.Join(destDir, filepath.FromSlash(filename))
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, os.FileMode(hdr.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0777); err != nil {
+				return err
+			}
+			w, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(hdr.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(w, tr); err != nil {
+				w.Close()
+				return err
+			}
+			w.Close()
+		}
 	}
 	return nil
+}
+
+func (b *BuildInput) buildSource(ctx context.Context, goroot string, args []string, env []string) error {
+	cmd := exec.CommandContext(ctx, "./make.bash", args...)
+	cmd.Dir = filepath.Join(goroot, "src")
+	cmd.Env = append(os.Environ(),
+		"CC=gcc -no-pie",
+		"CGO_ENABLED=0",
+		"GOROOT=",
+		"GOROOT_BOOTSTRAP=",
+		"GOTOOLCHAIN=local",
+		"GOPATH=",
+		"GOFLAGS=",
+		"GOEXPERIMENT=",
+		// TODO: clear more env vars
+	)
+	cmd.Env = append(cmd.Env, env...)
+	cmd.Stdout = b.Log
+	cmd.Stderr = b.Log
+	return cmd.Run()
+}
+
+func (b *BuildInput) getToolchain(ctx context.Context, version Version) ([]byte, error) {
+	if b.GetToolchain == nil {
+		return nil, nil
+	}
+	f, err := b.GetToolchain(ctx, version)
+	if err != nil {
+		return nil, err
+	} else if f == nil {
+		return nil, nil
+	}
+	defer f.Close()
+	return io.ReadAll(f)
+}
+
+func (b *BuildInput) logf(format string, a ...any) {
+	if b.Log != nil {
+		fmt.Fprintf(b.Log, format+"\n", a...)
+	}
 }

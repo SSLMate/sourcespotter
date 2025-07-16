@@ -9,7 +9,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	_ "github.com/lib/pq"
 
-	"software.sslmate.com/src/sourcespotter/toolchain"
+	"software.sslmate.com/src/sourcespotter/toolchain/auditor"
 )
 
 func main() {
@@ -42,12 +42,12 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	toolchain.AWSConfig = cfg
-	toolchain.S3Bucket = flags.s3bucket
-	toolchain.LambdaArch = flags.lambdaArch
-	toolchain.LambdaFunc = flags.lambdaFunc
+	auditor.AWSConfig = cfg
+	auditor.S3Bucket = flags.s3bucket
+	auditor.LambdaArch = flags.lambdaArch
+	auditor.LambdaFunc = flags.lambdaFunc
 
-	if err := toolchain.BuildAll(context.Background(), db); err != nil {
+	if err := auditor.AuditAll(context.Background(), db); err != nil {
 		log.Fatal(err)
 	}
 }
