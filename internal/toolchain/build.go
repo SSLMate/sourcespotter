@@ -7,8 +7,8 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
-// Package auditor verifies that the toolchains in the sumdb are reproducible
-package auditor
+// Package toolchain verifies that the toolchains in the sumdb are reproducible
+package toolchain
 
 import (
 	"bytes"
