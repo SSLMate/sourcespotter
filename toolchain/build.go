@@ -176,19 +176,26 @@ func (b *BuildInput) getSource(ctx context.Context, goVersion string, destDir st
 }
 
 func (b *BuildInput) buildSource(ctx context.Context, goroot string, args []string, env []string) error {
+	dir := filepath.Join(goroot, "src")
 	cmd := exec.CommandContext(ctx, "./make.bash", args...)
-	cmd.Dir = filepath.Join(goroot, "src")
-	cmd.Env = append(os.Environ(),
+	cmd.Dir = dir
+	cmd.Env = []string{
+		// standard environment variables
+		"LANG=C",
+		"PATH=/usr/local/bin:/usr/bin:/bin",
+		"SHELL=/bin/sh",
+		"PWD=" + dir,
+
+		// environment variables that affect the toolchain build
 		"CC=gcc -no-pie",
 		"CGO_ENABLED=0",
-		"GOROOT=",
-		"GOROOT_BOOTSTRAP=",
 		"GOTOOLCHAIN=local",
-		"GOPATH=",
-		"GOFLAGS=",
-		"GOEXPERIMENT=",
-		// TODO: clear more env vars
-	)
+	}
+	for _, name := range []string{"USER", "LOGNAME", "HOME", "TMPDIR"} {
+		if value, ok := os.LookupEnv(name); ok {
+			cmd.Env = append(cmd.Env, name+"="+value)
+		}
+	}
 	cmd.Env = append(cmd.Env, env...)
 	cmd.Stdout = b.Log
 	cmd.Stderr = b.Log
