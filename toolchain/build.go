@@ -93,9 +93,18 @@ func (b *BuildInput) prepareBootstrap(ctx context.Context, goversion string) (st
 	if err := b.getSource(ctx, bootstrapVersion, gorootBootstrap); err != nil {
 		return "", fmt.Errorf("error getting source for %s: %w", bootstrapVersion, err)
 	}
-	if err := b.buildSource(ctx, gorootBootstrap, nil, []string{
-		"GOROOT_BOOTSTRAP=" + gorootBootstrap2,
-	}); err != nil {
+	var env []string
+	if gorootBootstrap2 == "" {
+		// bootstrapping using C compiler
+		// these settings are needed to build the toolchain successfully on modern systems
+		env = append(env,
+			"CC=gcc -no-pie",
+			"CGO_ENABLED=0",
+		)
+	} else {
+		env = append(env, "GOROOT_BOOTSTRAP="+gorootBootstrap2)
+	}
+	if err := b.buildSource(ctx, gorootBootstrap, nil, env); err != nil {
 		return "", fmt.Errorf("error building source for %s (using %q for bootstrap): %w", bootstrapVersion, gorootBootstrap2, err)
 	}
 	return gorootBootstrap, nil
@@ -187,8 +196,6 @@ func (b *BuildInput) buildSource(ctx context.Context, goroot string, args []stri
 		"PWD=" + dir,
 
 		// environment variables that affect the toolchain build
-		"CC=gcc -no-pie",
-		"CGO_ENABLED=0",
 		"GOTOOLCHAIN=local",
 	}
 	for _, name := range []string{"USER", "LOGNAME", "HOME", "TMPDIR"} {
