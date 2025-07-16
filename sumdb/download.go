@@ -7,6 +7,7 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
+// Package sumdb contains a client for the Go checksum database
 package sumdb
 
 import (

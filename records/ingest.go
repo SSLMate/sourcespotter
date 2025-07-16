@@ -7,6 +7,7 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
+// Package records contains code to ingest sumdb records into the database
 package records
 
 import (

@@ -7,6 +7,7 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
+// Package dashboard implements Source Spotter's HTML dashboard
 package dashboard
 
 import (

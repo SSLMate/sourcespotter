@@ -7,6 +7,7 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
+// Package sths contains code to download, audit, and gossip STHs (checkpoints)
 package sths
 
 import (

@@ -7,6 +7,7 @@
 // This software is distributed WITHOUT A WARRANTY OF ANY KIND.
 // See the Mozilla Public License for details.
 
+// sourcespotter is a daemon that continuously audits the Go checksum database
 package main
 
 import (
