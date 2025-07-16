@@ -16,7 +16,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"os"
 	"slices"
@@ -184,7 +183,7 @@ func compare(ctx context.Context, version toolchain.Version, expectedSHA256 []by
 	if err != nil {
 		return false, fmt.Errorf("error downloading built toolchain: %w", err)
 	}
-	toolchainFilename, err := downloadToTempFile(toolchainReader)
+	toolchainFilename, err := copyToTempFile(toolchainReader)
 	if err != nil {
 		return false, fmt.Errorf("error saving built toolchain: %w", err)
 	}
@@ -195,27 +194,6 @@ func compare(ctx context.Context, version toolchain.Version, expectedSHA256 []by
 		return false, fmt.Errorf("error hashing built toolchain: %w", err)
 	}
 	return gotHash == "h1:"+base64.StdEncoding.EncodeToString(expectedSHA256), nil
-}
-
-func downloadToTempFile(r io.ReadCloser) (filename string, retErr error) {
-	defer r.Close()
-	f, err := os.CreateTemp("", "download")
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		f.Close()
-		if retErr != nil {
-			os.Remove(f.Name())
-		}
-	}()
-	if _, err := io.Copy(f, r); err != nil {
-		return "", err
-	}
-	if err := f.Close(); err != nil {
-		return "", err
-	}
-	return f.Name(), nil
 }
 
 type buildStatus string
@@ -250,12 +228,4 @@ func storeBuildResult(ctx context.Context, db *sql.DB, modversion string, result
 		return fmt.Errorf("error storing %s build result for %q: %w", result.Status, modversion, err)
 	}
 	return nil
-}
-
-func sqlString(s string) sql.NullString {
-	return sql.NullString{Valid: true, String: s}
-}
-
-func sqlInterval(d time.Duration) sql.NullString {
-	return sqlString(fmt.Sprintf("%d milliseconds", d.Milliseconds()))
 }

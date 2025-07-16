@@ -14,47 +14,14 @@ import (
 	"context"
 	"crypto/sha256"
 	"database/sql"
-	"errors"
 	"fmt"
-	"io"
 	"log"
-	"net/http"
-	"net/url"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"src.agwa.name/go-dbutil"
 )
-
-func download(ctx context.Context, getURL string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		resp.Body.Close()
-		return nil, &url.Error{Op: "Get", URL: getURL, Err: errors.New(resp.Status)}
-	}
-	return resp.Body, nil
-}
-
-func downloadBytes(ctx context.Context, getURL string) ([]byte, error) {
-	r, err := download(ctx, getURL)
-	if err != nil {
-		return nil, err
-	}
-	defer r.Close()
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return nil, &url.Error{Op: "Get", URL: getURL, Err: err}
-	}
-	return data, nil
-}
 
 func saveSource(ctx context.Context, goversion string, url string) ([]byte, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(60*time.Second))
