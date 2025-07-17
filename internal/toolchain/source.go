@@ -76,7 +76,7 @@ func SaveSource(ctx context.Context, db *sql.DB, goversion string) (string, erro
 		if err := tx.Rollback(); err != nil {
 			return "", fmt.Errorf("error rolling back database transaction: %w", err)
 		}
-		return "", nil
+		return getPresignedSourceURL(ctx, goversion)
 	} else if err != nil {
 		return "", fmt.Errorf("error inserting toolchain_source row: %w", err)
 	}
@@ -94,6 +94,10 @@ func SaveSource(ctx context.Context, db *sql.DB, goversion string) (string, erro
 		return "", fmt.Errorf("error committing database transaction: %w", err)
 	}
 
+	return getPresignedSourceURL(ctx, goversion)
+}
+
+func getPresignedSourceURL(ctx context.Context, goversion string) (string, error) {
 	presignedURL, err := presignGetObject(ctx, sourceObjectName(goversion))
 	if err != nil {
 		return "", fmt.Errorf("error presigning source download: %w", err)
