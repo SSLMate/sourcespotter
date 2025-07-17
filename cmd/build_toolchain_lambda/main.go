@@ -35,17 +35,10 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	"os/exec"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"software.sslmate.com/src/sourcespotter/toolchain"
 )
-
-func init() {
-	if output, err := exec.Command("dnf", "install", "-y", "gcc").CombinedOutput(); err != nil {
-		panic(fmt.Errorf("dnf install: %w: %s", err, bytes.TrimSpace(output)))
-	}
-}
 
 type Event struct {
 	Version       toolchain.Version
@@ -65,8 +58,8 @@ func handler(ctx context.Context, event Event) error {
 	var logBuf bytes.Buffer
 
 	input := &toolchain.BuildInput{
-		WorkDir:   workDir,
-		Version:   event.Version,
+		WorkDir: workDir,
+		Version: event.Version,
 		GetSource: func(ctx context.Context, version string) (io.ReadCloser, error) {
 			url, ok := event.SourceURLs[version]
 			if !ok {
