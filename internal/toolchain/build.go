@@ -170,7 +170,6 @@ func Audit(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 	}
 
 	log.Printf("invoking lambda %s for %s.%s-%s", LambdaFunc, version.GoVersion, version.GOOS, version.GOARCH)
-	log.Print(string(payload))
 	start := time.Now()
 	lambdaResult, err := newLambdaClient().Invoke(ctx, &lambda.InvokeInput{
 		FunctionName: aws.String(LambdaFunc),
