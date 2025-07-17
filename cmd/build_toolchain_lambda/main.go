@@ -42,11 +42,8 @@ import (
 )
 
 func init() {
-	if output, err := exec.Command("sudo", "apt-get", "update").CombinedOutput(); err != nil {
-		panic(fmt.Errorf("apt-get update: %w: %s", err, bytes.TrimSpace(output)))
-	}
-	if output, err := exec.Command("sudo", "apt-get", "install", "-y", "gcc", "libc6-dev").CombinedOutput(); err != nil {
-		panic(fmt.Errorf("apt-get install: %w: %s", err, bytes.TrimSpace(output)))
+	if output, err := exec.Command("sudo", "dnf", "install", "-y", "gcc").CombinedOutput(); err != nil {
+		panic(fmt.Errorf("dnf install: %w: %s", err, bytes.TrimSpace(output)))
 	}
 }
 
