@@ -40,6 +40,10 @@ import (
 	"software.sslmate.com/src/sourcespotter/toolchain"
 )
 
+func init() {
+	os.Setenv("HOME", "/tmp")
+}
+
 type Event struct {
 	Version       toolchain.Version
 	SourceURLs    map[string]string
