@@ -86,7 +86,7 @@ func SaveSource(ctx context.Context, db *sql.DB, goversion string) (string, erro
 		return "", err
 	}
 
-	if _, err := tx.ExecContext(ctx, `UPDATE toolchain_source SET sha256 = $1 WHERE version = $2`, goversion, sha256); err != nil {
+	if _, err := tx.ExecContext(ctx, `UPDATE toolchain_source SET sha256 = $1 WHERE version = $2`, sha256, goversion); err != nil {
 		return "", fmt.Errorf("error updating toolchain_source row: %w", err)
 	}
 
