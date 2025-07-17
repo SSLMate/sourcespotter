@@ -42,7 +42,7 @@ import (
 )
 
 func init() {
-	if output, err := exec.Command("sudo", "dnf", "install", "-y", "gcc").CombinedOutput(); err != nil {
+	if output, err := exec.Command("dnf", "install", "-y", "gcc").CombinedOutput(); err != nil {
 		panic(fmt.Errorf("dnf install: %w: %s", err, bytes.TrimSpace(output)))
 	}
 }
