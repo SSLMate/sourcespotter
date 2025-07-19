@@ -99,3 +99,11 @@ func getObject(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	}
 	return out.Body, nil
 }
+
+func deleteObject(ctx context.Context, objectName string) error {
+	_, err := newS3Client().DeleteObject(ctx, &s3.DeleteObjectInput{
+		Bucket: aws.String(S3Bucket),
+		Key:    aws.String(objectName),
+	})
+	return err
+}

@@ -191,6 +191,9 @@ func Audit(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 		result.Message = sqlString(err.Error())
 	} else if isEqual {
 		result.Status = buildEqual
+		if err := deleteObject(ctx, zipObj); err != nil {
+			return fmt.Errorf("error deleting zip: %w", err)
+		}
 	} else {
 		result.Status = buildUnequal
 	}
