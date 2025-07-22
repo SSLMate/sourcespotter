@@ -53,18 +53,6 @@ func newLambdaClient() *lambda.Client {
 	return lambda.NewFromConfig(AWSConfig)
 }
 
-func sourceObjectName(goversion string) string {
-	return "src/" + goversion + ".src.tar.gz"
-}
-
-func toolchainObjectName(modversion string) string {
-	return "toolchain/" + modversion + ".zip"
-}
-
-func logObjectName(modversion string) string {
-	return "log/" + modversion + "@" + time.Now().UTC().Format(time.RFC3339)
-}
-
 func presignPutObject(ctx context.Context, objectName string) (string, error) {
 	presigner := s3.NewPresignClient(newS3Client())
 	presigned, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{

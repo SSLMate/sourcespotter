@@ -36,14 +36,19 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"software.sslmate.com/src/sourcespotter/internal/httpclient"
 	"src.agwa.name/go-dbutil"
 )
+
+func sourceObjectName(goversion string) string {
+	return "src/" + goversion + ".src.tar.gz"
+}
 
 func saveSource(ctx context.Context, goversion string, url string) ([]byte, error) {
 	ctx, cancel := context.WithDeadline(ctx, time.Now().Add(60*time.Second))
 	defer cancel()
 
-	source, err := downloadBytes(ctx, url)
+	source, err := httpclient.DownloadBytes(ctx, url)
 	if err != nil {
 		return nil, err
 	}

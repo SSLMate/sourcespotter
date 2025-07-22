@@ -27,16 +27,19 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"net/http"
-	"net/url"
+	"io/fs"
 	"os"
 
 	"github.com/aws/aws-lambda-go/lambda"
+	"golang.org/x/mod/sumdb/dirhash"
+	"software.sslmate.com/src/sourcespotter/internal/httpclient"
+	toolchainlambda "software.sslmate.com/src/sourcespotter/internal/toolchain/lambda"
 	"software.sslmate.com/src/sourcespotter/toolchain"
 )
 
@@ -44,15 +47,13 @@ func init() {
 	os.Setenv("HOME", "/tmp")
 }
 
-type Event struct {
-	Version       toolchain.Version
-	SourceURLs    map[string]string
-	ToolchainURLs map[string]string
-	ZipUploadURL  string
-	LogUploadURL  string
-}
+func handler(ctx context.Context, event toolchainlambda.Event) error {
+	gorootBootstrap, err := downloadToolchain(ctx, event.BootstrapURL, event.BootstrapHash)
+	if err != nil {
+		return fmt.Errorf("error downloading bootstrap toolchain: %w", err)
+	}
+	defer os.RemoveAll(gorootBootstrap)
 
-func handler(ctx context.Context, event Event) error {
 	workDir, err := os.MkdirTemp("", "build-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
@@ -62,21 +63,14 @@ func handler(ctx context.Context, event Event) error {
 	var logBuf bytes.Buffer
 
 	input := &toolchain.BuildInput{
-		WorkDir: workDir,
-		Version: event.Version,
-		GetSource: func(ctx context.Context, version string) (io.ReadCloser, error) {
-			url, ok := event.SourceURLs[version]
-			if !ok {
-				return nil, fmt.Errorf("no URL provided for source %q in the Lambda input", version)
+		WorkDir:         workDir,
+		Version:         event.Version,
+		GorootBootstrap: gorootBootstrap,
+		GetSource: func(ctx context.Context, goversion string) (io.ReadCloser, error) {
+			if goversion != event.Version.GoVersion {
+				return nil, fmt.Errorf("no source available for %q", goversion)
 			}
-			return download(ctx, url)
-		},
-		GetToolchain: func(ctx context.Context, version toolchain.Version) (io.ReadCloser, error) {
-			url, ok := event.ToolchainURLs[version.ModVersion()]
-			if !ok {
-				return nil, nil
-			}
-			return download(ctx, url)
+			return httpclient.Download(ctx, event.SourceURL)
 		},
 		Log: &logBuf,
 	}
@@ -88,45 +82,51 @@ func handler(ctx context.Context, event Event) error {
 		errs = append(errs, fmt.Errorf("uploading zip failed: %w", err))
 	}
 
-	if err := upload(ctx, event.LogUploadURL, &logBuf); err != nil {
+	if err := httpclient.Upload(ctx, event.LogUploadURL, &logBuf); err != nil {
 		errs = append(errs, fmt.Errorf("uploading log failed: %w", err))
 	}
 
 	return errors.Join(errs...)
 }
 
-func download(ctx context.Context, downloadURL string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, downloadURL, nil)
+func downloadToolchain(ctx context.Context, zipURL string, expectedHash string) (path string, err error) {
+	zipFilename, err := httpclient.DownloadToTempFile(ctx, zipURL)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	defer os.Remove(zipFilename)
+	if hash, err := dirhash.HashZip(zipFilename, dirhash.Hash1); err != nil {
+		return "", err
+	} else if hash != expectedHash {
+		return "", fmt.Errorf("%q has unexpected hash %s (expected %s)", zipURL, hash, expectedHash)
+	}
+	zipReader, err := zip.OpenReader(zipFilename)
 	if err != nil {
-		return nil, err
+		return "", err
 	}
-	if resp.StatusCode != 200 {
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, &url.Error{Op: "Get", URL: downloadURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
-	}
-	return resp.Body, nil
-}
+	defer zipReader.Close()
 
-func upload(ctx context.Context, uploadURL string, body io.Reader) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, body)
+	gorootPaths, _ := fs.Glob(zipReader, "golang.org/toolchain@*")
+	if len(gorootPaths) != 1 {
+		return "", fmt.Errorf("%q does not appear to be a toolchain zip", zipURL)
+	}
+	fsys, err := fs.Sub(zipReader, gorootPaths[0])
 	if err != nil {
-		return err
+		return "", fmt.Errorf("error making toolchain filesystem: %w", err)
 	}
-	resp, err := http.DefaultClient.Do(req)
+	tempdir, err := os.MkdirTemp("", "toolchain-*")
 	if err != nil {
-		return err
+		return "", fmt.Errorf("failed to create temp dir: %w", err)
 	}
-	respBody, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &url.Error{Op: "Put", URL: uploadURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(tempdir)
+		}
+	}()
+	if err := os.CopyFS(tempdir, fsys); err != nil {
+		return "", fmt.Errorf("error unzipping toolchain: %w", err)
 	}
-	return nil
+	return tempdir, nil
 }
 
 func uploadFile(ctx context.Context, url, path string) error {
@@ -134,7 +134,7 @@ func uploadFile(ctx context.Context, url, path string) error {
 	if err != nil {
 		return err
 	}
-	return upload(ctx, url, bytes.NewReader(f))
+	return httpclient.Upload(ctx, url, bytes.NewReader(f))
 }
 
 func main() {

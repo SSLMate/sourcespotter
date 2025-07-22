@@ -28,18 +28,14 @@ package toolchain
 
 import (
 	"archive/tar"
-	"archive/zip"
-	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
-	"io/fs"
 	"os"
 	"os/exec"
 	"path"
 	"path/filepath"
-	"runtime"
 	"strings"
 )
 
@@ -50,11 +46,11 @@ type BuildInput struct {
 	// Version is the version of the toolchain to build
 	Version Version
 
+	// GorootBootstrap is the path to a GOROOT to use for bootstrapping; if empty, then bootstrap toolchains will be downloaded with GetSource and built using the host's C compiler
+	GorootBootstrap string
+
 	// GetSource returns the source tar.gz file for the given Go version, e.g. "go1.24.4"
 	GetSource func(context.Context, string) (io.ReadCloser, error)
-
-	// GetToolchain, if non-nil, returns a pre-built toolchain zip file for the given version, or nil, nil if a pre-built toolchain is not available
-	GetToolchain func(context.Context, Version) (io.ReadCloser, error)
 
 	// Log, if non-nil, receives the output the build scripts
 	Log io.Writer
@@ -66,9 +62,13 @@ func Build(ctx context.Context, input *BuildInput) (string, error) {
 }
 
 func (b *BuildInput) build(ctx context.Context) (string, error) {
-	gorootBootstrap, err := b.prepareBootstrap(ctx, b.Version.GoVersion)
-	if err != nil {
-		return "", err
+	gorootBootstrap := b.GorootBootstrap
+	if gorootBootstrap == "" {
+		var err error
+		gorootBootstrap, err = b.buildBootstrap(ctx, b.Version.GoVersion)
+		if err != nil {
+			return "", err
+		}
 	}
 
 	b.logf("Getting source for %s...", b.Version.GoVersion)
@@ -93,22 +93,14 @@ func (b *BuildInput) build(ctx context.Context) (string, error) {
 	return zippath, nil
 }
 
-func (b *BuildInput) prepareBootstrap(ctx context.Context, goversion string) (string, error) {
+func (b *BuildInput) buildBootstrap(ctx context.Context, goversion string) (string, error) {
 	bootstrapVersion := BootstrapToolchain(goversion)
 	if bootstrapVersion == "" {
 		// only need C compiler
 		return "", nil
 	}
 
-	// see if there is a pre-built toolchain for bootstrapVersion
-	if gorootBootstrap, err := b.installBootstrapToolchain(ctx, bootstrapVersion); err != nil {
-		return "", fmt.Errorf("error installing bootstrap toolchain %s: %w", bootstrapVersion, err)
-	} else if gorootBootstrap != "" {
-		return gorootBootstrap, nil
-	}
-
-	// no pre-built toolchain; need to build bootstrapVersion from source
-	gorootBootstrap2, err := b.prepareBootstrap(ctx, bootstrapVersion)
+	gorootBootstrap2, err := b.buildBootstrap(ctx, bootstrapVersion)
 	if err != nil {
 		return "", err
 	}
@@ -133,30 +125,6 @@ func (b *BuildInput) prepareBootstrap(ctx context.Context, goversion string) (st
 		return "", fmt.Errorf("error building source for %s (using %q for bootstrap): %w", bootstrapVersion, gorootBootstrap2, err)
 	}
 	return gorootBootstrap, nil
-}
-
-func (b *BuildInput) installBootstrapToolchain(ctx context.Context, bootstrapVersion string) (string, error) {
-	version := Version{GoVersion: bootstrapVersion, GOOS: runtime.GOOS, GOARCH: runtime.GOARCH}
-	zipBytes, err := b.getToolchain(ctx, version)
-	if err != nil {
-		return "", fmt.Errorf("error downloading bootstrap toolchain: %w", err)
-	} else if zipBytes == nil {
-		return "", nil
-	}
-	b.logf("Installing %s to use for bootstrap...", version.ModVersion())
-	zipReader, err := zip.NewReader(bytes.NewReader(zipBytes), int64(len(zipBytes)))
-	if err != nil {
-		return "", fmt.Errorf("error reading bootstrap toolchain zip: %w", err)
-	}
-	fsys, err := fs.Sub(zipReader, "golang.org/toolchain@"+version.ModVersion())
-	if err != nil {
-		return "", fmt.Errorf("error making bootstrap toolchain filesystem: %w", err)
-	}
-	bootstrapDir := filepath.Join(b.WorkDir, bootstrapVersion)
-	if err := os.CopyFS(bootstrapDir, fsys); err != nil {
-		return "", fmt.Errorf("error unzipping bootstrap toolchain: %w", err)
-	}
-	return bootstrapDir, nil
 }
 
 func (b *BuildInput) getSource(ctx context.Context, goVersion string, destDir string) error {
@@ -232,20 +200,6 @@ func (b *BuildInput) buildSource(ctx context.Context, goroot string, args []stri
 	cmd.Stdout = b.Log
 	cmd.Stderr = b.Log
 	return cmd.Run()
-}
-
-func (b *BuildInput) getToolchain(ctx context.Context, version Version) ([]byte, error) {
-	if b.GetToolchain == nil {
-		return nil, nil
-	}
-	f, err := b.GetToolchain(ctx, version)
-	if err != nil {
-		return nil, err
-	} else if f == nil {
-		return nil, nil
-	}
-	defer f.Close()
-	return io.ReadAll(f)
 }
 
 func (b *BuildInput) logf(format string, a ...any) {

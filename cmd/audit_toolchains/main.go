@@ -39,15 +39,19 @@ import (
 
 func main() {
 	var flags struct {
-		db         string
-		s3bucket   string
-		lambdaArch string
-		lambdaFunc string
+		db          string
+		s3bucket    string
+		lambdaArch  string
+		lambdaFunc  string
+		go120Object string
+		go120Hash   string
 	}
 	flag.StringVar(&flags.db, "db", "", "Database address")
 	flag.StringVar(&flags.s3bucket, "s3-bucket", "", "S3 bucket for artifacts")
 	flag.StringVar(&flags.lambdaArch, "lambda-arch", "", "Lambda architecture")
 	flag.StringVar(&flags.lambdaFunc, "lambda-func", "", "Lambda function name")
+	flag.StringVar(&flags.go120Object, "go120-object", "", "S3 object containing Go 1.20 bootstrap toolchain zip")
+	flag.StringVar(&flags.go120Hash, "go120-hash", "", "dirhash of Go 1.20 bootstrap toolchain zip")
 	flag.Parse()
 
 	if flags.db == "" {
@@ -71,8 +75,11 @@ func main() {
 	toolchain.S3Bucket = flags.s3bucket
 	toolchain.LambdaArch = flags.lambdaArch
 	toolchain.LambdaFunc = flags.lambdaFunc
+	toolchain.Go120Object = flags.go120Object
+	toolchain.Go120Hash = flags.go120Hash
 
-	if err := toolchain.AuditAll(context.Background(), db); err != nil {
+	//if err := toolchain.AuditAll(context.Background(), db); err != nil {
+	if err := toolchain.Audit(context.Background(), db, flag.Arg(0), flag.Arg(1)); err != nil {
 		log.Fatal(err)
 	}
 }

@@ -29,10 +29,12 @@ package toolchain
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"database/sql"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	goversion "go/version"
 	"log"
 	"os"
 	"slices"
@@ -43,8 +45,15 @@ import (
 	"golang.org/x/mod/semver"
 	"golang.org/x/mod/sumdb/dirhash"
 	"golang.org/x/sync/errgroup"
+	"software.sslmate.com/src/sourcespotter/internal/httpclient"
+	toolchainlambda "software.sslmate.com/src/sourcespotter/internal/toolchain/lambda"
 	"software.sslmate.com/src/sourcespotter/toolchain"
 	"src.agwa.name/go-dbutil"
+)
+
+var (
+	Go120Object string
+	Go120Hash   string
 )
 
 // AuditAll tries building all toolchains in the sumdb that haven't already been built
@@ -78,11 +87,11 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 			if inconsistent {
 				return storeBuildResult(ctx, db, version, &buildResult{
 					Status:  buildFailed,
-					Message: sqlString("sumdb contains more than one checksum for this toolchain"),
+					Message: sqlValid("sumdb contains more than one checksum for this toolchain"),
 				})
 			}
 			g.Go(func() error {
-				if err := Audit(ctx, db, version, sha256); err != nil {
+				if err := Audit(ctx, db, version, formatHash1(sha256)); err != nil {
 					return fmt.Errorf("error building %s: %w", version, err)
 				}
 				return nil
@@ -94,77 +103,120 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 }
 
 // Audit checks that the building the given toolchain results in the given checksum
-func Audit(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []byte) error {
-	type lambdaInputType struct {
-		Version       toolchain.Version
-		SourceURLs    map[string]string
-		ToolchainURLs map[string]string
-		ZipUploadURL  string
-		LogUploadURL  string
-	}
+func Audit(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
 	version, ok := toolchain.ParseModVersion(modversion)
 	if !ok {
 		return storeBuildResult(ctx, db, modversion, &buildResult{
 			Status:  buildFailed,
-			Message: sqlString("unable to parse module version"),
+			Message: sqlValid("unable to parse module version"),
 		})
 	}
-	if !toolchain.IsReproducible(version.GoVersion) {
-		return storeBuildResult(ctx, db, modversion, &buildResult{
-			Status:  buildSkipped,
-			Message: sqlString("this version of Go is not reproducible"),
-		})
+	if version.GOOS == "darwin" {
+		fixedHash, err := getFixedHash(ctx, version, expectedHash, toolchain.StripDarwinSig)
+		if err != nil {
+			return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+				Status:  buildFailed,
+				Message: sqlValid(err.Error()),
+			})
+		}
+		expectedHash = fixedHash
 	}
-	lambdaInput := &lambdaInputType{
-		Version:       version,
-		SourceURLs:    make(map[string]string),
-		ToolchainURLs: make(map[string]string),
-	}
-
-	if url, err := SaveSource(ctx, db, version.GoVersion); err != nil {
-		return fmt.Errorf("error saving source code: %w", err)
+	if goversion.Compare(version.GoVersion, "go1.21.0") < 0 {
+		return process0(ctx, db, version, expectedHash)
+	} else if goversion.Compare(version.GoVersion, "go1.24.0") < 0 {
+		return process1(ctx, db, version, expectedHash)
 	} else {
-		lambdaInput.SourceURLs[version.GoVersion] = url
+		return process2(ctx, db, version, expectedHash)
+	}
+}
+
+// process a non-reproducible toolchain (prior to Go 1.21)
+func process0(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
+	return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+		Status:  buildSkipped,
+		Message: sqlValid("this version of Go is not reproducible"),
+	})
+}
+
+// process a toolchain (Go 1.21 - 1.23) that can be reproduced with a non-reproducible Go 1.20 bootstrap toolchain
+func process1(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
+	if Go120Object == "" || Go120Hash == "" {
+		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			Status:  buildSkipped,
+			Message: sqlValid("Go 1.20 bootstrap toolchain not configured"),
+		})
+	}
+	bootstrapURL, err := presignGetObject(ctx, Go120Object)
+	if err != nil {
+		return fmt.Errorf("error presigning bootstrap download: %w", err)
+	}
+	return build(ctx, db, version, expectedHash, bootstrapURL, Go120Hash)
+}
+
+// process a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
+func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
+	bootstrapVersion := toolchain.Version{
+		GoVersion: toolchain.BootstrapToolchain(version.GoVersion),
+		GOOS:      "linux",
+		GOARCH:    LambdaArch,
+	}
+	var (
+		bootstrapSHA256 []byte
+		bootstrapStatus sql.Null[buildStatus]
+	)
+	if err := db.QueryRowContext(ctx, `
+		SELECT record.source_sha256, toolchain_build.status
+		FROM record
+		LEFT JOIN toolchain_build USING (version)
+		WHERE record.module = 'golang.org/toolchain' AND record.version = $1
+	`, bootstrapVersion.ModVersion()).Scan(&bootstrapSHA256, &bootstrapStatus); err == sql.ErrNoRows {
+		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			Status:  buildFailed,
+			Message: sqlValid(fmt.Sprintf("bootstrap toolchain %q not found in module database", bootstrapVersion.ModVersion())),
+		})
+	} else if err != nil {
+		return fmt.Errorf("error looking up bootstrap toolchain %q: %w", bootstrapVersion.ModVersion(), err)
+	} else if bootstrapStatus.V != buildEqual {
+		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			Status:  buildFailed,
+			Message: sqlValid(fmt.Sprintf("bootstrap toolchain %q not verified to be reproducible", bootstrapVersion.ModVersion())),
+		})
 	}
 
-	bootstrapVersion := toolchain.BootstrapToolchain(version.GoVersion)
-	for bootstrapVersion != "" {
-		if toolchain.IsReproducible(bootstrapVersion) {
-			modVersion := toolchain.Version{GoVersion: bootstrapVersion, GOOS: "linux", GOARCH: LambdaArch}.ModVersion()
-			obj := toolchainObjectName(modVersion)
-			if url, err := presignGetObject(ctx, obj); err != nil {
-				return fmt.Errorf("error presigning bootstrap toolchain: %w", err)
-			} else {
-				lambdaInput.ToolchainURLs[modVersion] = url
-			}
-			break
-		}
-		if url, err := SaveSource(ctx, db, bootstrapVersion); err != nil {
-			return fmt.Errorf("error saving source code for %s (needed for bootstrap): %w", bootstrapVersion, err)
-		} else {
-			lambdaInput.SourceURLs[bootstrapVersion] = url
-		}
-		bootstrapVersion = toolchain.BootstrapToolchain(bootstrapVersion)
+	return build(ctx, db, version, expectedHash, toolchainURL(bootstrapVersion), formatHash1(bootstrapSHA256))
+}
+
+func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, bootstrapURL string, bootstrapHash string) error {
+	sourceURL, err := SaveSource(ctx, db, version.GoVersion)
+	if err != nil {
+		return fmt.Errorf("error saving source code: %w", err)
 	}
+	lambdaEvent := &toolchainlambda.Event{
+		Version:       version,
+		SourceURL:     sourceURL,
+		BootstrapURL:  bootstrapURL,
+		BootstrapHash: bootstrapHash,
+	}
+
+	var buildID [16]byte
+	rand.Read(buildID[:])
 
 	var (
-		zipObj = toolchainObjectName(version.ModVersion())
-		logObj = logObjectName(version.ModVersion())
+		zipObj = fmt.Sprintf("out/%s.%x.zip", version.ModVersion(), buildID)
+		logObj = fmt.Sprintf("out/%s.%x.log", version.ModVersion(), buildID)
 	)
-
 	if url, err := presignPutObject(ctx, zipObj); err != nil {
 		return fmt.Errorf("error presigning zip upload: %w", err)
 	} else {
-		lambdaInput.ZipUploadURL = url
+		lambdaEvent.ZipUploadURL = url
 	}
-
 	if url, err := presignPutObject(ctx, logObj); err != nil {
 		return fmt.Errorf("error presigning log upload: %w", err)
 	} else {
-		lambdaInput.LogUploadURL = url
+		lambdaEvent.LogUploadURL = url
 	}
 
-	payload, err := json.Marshal(lambdaInput)
+	payload, err := json.Marshal(lambdaEvent)
 	if err != nil {
 		return fmt.Errorf("error encoding lambda payload: %w", err)
 	}
@@ -177,18 +229,18 @@ func Audit(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 	})
 	duration := time.Since(start)
 	result := &buildResult{
-		BuildDuration: sqlInterval(duration),
-		LogFile:       sqlString(logObj),
+		BuildDuration: sqlValid(sqlInterval(duration)),
+		BuildID:       sqlValid(buildID[:]),
 	}
 	if err != nil {
 		result.Status = buildFailed
-		result.Message = sqlString(err.Error())
+		result.Message = sqlValid(err.Error())
 	} else if lambdaResult.FunctionError != nil {
 		result.Status = buildFailed
-		result.Message = sqlString(string(lambdaResult.Payload))
-	} else if isEqual, err := compare(ctx, version, expectedSHA256); err != nil {
+		result.Message = sqlValid(string(lambdaResult.Payload))
+	} else if isEqual, err := compare(ctx, zipObj, expectedHash); err != nil {
 		result.Status = buildFailed
-		result.Message = sqlString(err.Error())
+		result.Message = sqlValid(err.Error())
 	} else if isEqual {
 		result.Status = buildEqual
 		if err := deleteObject(ctx, zipObj); err != nil {
@@ -197,15 +249,17 @@ func Audit(ctx context.Context, db *sql.DB, modversion string, expectedSHA256 []
 	} else {
 		result.Status = buildUnequal
 	}
-	return storeBuildResult(ctx, db, modversion, result)
+	return storeBuildResult(ctx, db, version.ModVersion(), result)
 }
 
-func compare(ctx context.Context, version toolchain.Version, expectedSHA256 []byte) (bool, error) {
-	toolchainReader, err := getObject(ctx, toolchainObjectName(version.ModVersion()))
+func compare(ctx context.Context, zipObj string, expectedHash string) (bool, error) {
+	toolchainReader, err := getObject(ctx, zipObj)
 	if err != nil {
 		return false, fmt.Errorf("error downloading built toolchain: %w", err)
 	}
-	toolchainFilename, err := copyToTempFile(toolchainReader)
+	defer toolchainReader.Close()
+
+	toolchainFilename, err := httpclient.CopyToTempFile(toolchainReader)
 	if err != nil {
 		return false, fmt.Errorf("error saving built toolchain: %w", err)
 	}
@@ -215,7 +269,30 @@ func compare(ctx context.Context, version toolchain.Version, expectedSHA256 []by
 	if err != nil {
 		return false, fmt.Errorf("error hashing built toolchain: %w", err)
 	}
-	return gotHash == "h1:"+base64.StdEncoding.EncodeToString(expectedSHA256), nil
+	return gotHash == expectedHash, nil
+}
+
+func getFixedHash(ctx context.Context, version toolchain.Version, expectedHash string, fix toolchain.HashFixer) (string, error) {
+	toolchainURL := toolchainURL(version)
+	toolchainFilename, err := httpclient.DownloadToTempFile(ctx, toolchainURL)
+	if err != nil {
+		return "", err
+	}
+	defer os.Remove(toolchainFilename)
+
+	gotHash, err := dirhash.HashZip(toolchainFilename, dirhash.Hash1)
+	if err != nil {
+		return "", fmt.Errorf("error hashing toolchain downloaded from %q: %w", toolchainURL, err)
+	}
+	if gotHash != expectedHash {
+		return "", fmt.Errorf("toolchain downloaded from %q has unexpected hash %s (expected %s)", toolchainURL, gotHash, expectedHash)
+	}
+
+	fixedHash, err := toolchain.HashZip(toolchainFilename, dirhash.Hash1, fix)
+	if err != nil {
+		return "", fmt.Errorf("error fixing hash of toolchain downloaded from %q: %w", toolchainURL, err)
+	}
+	return fixedHash, nil
 }
 
 type buildStatus string
@@ -229,25 +306,41 @@ const (
 
 type buildResult struct {
 	Status        buildStatus
-	Message       sql.NullString
-	LogFile       sql.NullString
-	BuildDuration sql.NullString
+	Message       sql.Null[string]
+	BuildID       sql.Null[[]byte]
+	BuildDuration sql.Null[string]
 }
 
 func storeBuildResult(ctx context.Context, db *sql.DB, modversion string, result *buildResult) error {
 	_, err := db.ExecContext(ctx, `
-		INSERT INTO toolchain_build (version, status, message, log_file, build_duration)
+		INSERT INTO toolchain_build (version, status, message, build_id, build_duration)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (version)
 		DO UPDATE SET
 			inserted_at = EXCLUDED.inserted_at,
 			status = EXCLUDED.status,
 			message = EXCLUDED.message,
-			log_file = EXCLUDED.log_file,
+			build_id = EXCLUDED.build_id,
 			build_duration = EXCLUDED.build_duration
-	`, modversion, result.Status, result.Message, result.LogFile, result.BuildDuration)
+	`, modversion, result.Status, result.Message, result.BuildID, result.BuildDuration)
 	if err != nil {
 		return fmt.Errorf("error storing %s build result for %q: %w", result.Status, modversion, err)
 	}
 	return nil
+}
+
+func formatHash1(sha256 []byte) string {
+	return "h1:" + base64.StdEncoding.EncodeToString(sha256)
+}
+
+func sqlValid[T any](v T) sql.Null[T] {
+	return sql.Null[T]{Valid: true, V: v}
+}
+
+func sqlInterval(d time.Duration) string {
+	return fmt.Sprintf("%d milliseconds", d.Milliseconds())
+}
+
+func toolchainURL(version toolchain.Version) string {
+	return fmt.Sprintf("https://proxy.golang.org/golang.org/toolchain/@v/%s.zip", version.ModVersion())
 }

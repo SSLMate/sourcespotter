@@ -79,7 +79,7 @@ CREATE TABLE toolchain_build (
 	inserted_at	timestamptz NOT NULL DEFAULT statement_timestamp(),
 	status		toolchain_build_status NOT NULL,
 	message		text,
-	log_file	text,
+	build_id	bytea,
 	build_duration	interval,
 
 	PRIMARY KEY (version)

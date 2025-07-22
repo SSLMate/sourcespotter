@@ -23,22 +23,20 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-package toolchain
+package httpclient
 
 import (
+	"bytes"
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"os"
-	"time"
 )
 
-func download(ctx context.Context, getURL string) (io.ReadCloser, error) {
-	req, err := http.NewRequestWithContext(ctx, "GET", getURL, nil)
+func Download(ctx context.Context, getURL string) (io.ReadCloser, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getURL, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -47,14 +45,15 @@ func download(ctx context.Context, getURL string) (io.ReadCloser, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
+		respBody, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		return nil, &url.Error{Op: "Get", URL: getURL, Err: errors.New(resp.Status)}
+		return nil, &url.Error{Op: "Get", URL: getURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
 	}
 	return resp.Body, nil
 }
 
-func downloadBytes(ctx context.Context, getURL string) ([]byte, error) {
-	r, err := download(ctx, getURL)
+func DownloadBytes(ctx context.Context, getURL string) ([]byte, error) {
+	r, err := Download(ctx, getURL)
 	if err != nil {
 		return nil, err
 	}
@@ -66,15 +65,44 @@ func downloadBytes(ctx context.Context, getURL string) ([]byte, error) {
 	return data, nil
 }
 
-func copyToTempFile(r io.ReadCloser) (filename string, retErr error) {
+func DownloadToTempFile(ctx context.Context, getURL string) (string, error) {
+	r, err := Download(ctx, getURL)
+	if err != nil {
+		return "", err
+	}
 	defer r.Close()
+	filename, err := CopyToTempFile(r)
+	if err != nil {
+		return "", &url.Error{Op: "Get", URL: getURL, Err: err}
+	}
+	return filename, nil
+}
+
+func Upload(ctx context.Context, uploadURL string, body io.Reader) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, body)
+	if err != nil {
+		return err
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &url.Error{Op: "Put", URL: uploadURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
+	}
+	return nil
+}
+
+func CopyToTempFile(r io.Reader) (filename string, err error) {
 	f, err := os.CreateTemp("", "tmp")
 	if err != nil {
 		return "", err
 	}
 	defer func() {
 		f.Close()
-		if retErr != nil {
+		if err != nil {
 			os.Remove(f.Name())
 		}
 	}()
@@ -85,12 +113,4 @@ func copyToTempFile(r io.ReadCloser) (filename string, retErr error) {
 		return "", err
 	}
 	return f.Name(), nil
-}
-
-func sqlString(s string) sql.NullString {
-	return sql.NullString{Valid: true, String: s}
-}
-
-func sqlInterval(d time.Duration) sql.NullString {
-	return sqlString(fmt.Sprintf("%d milliseconds", d.Milliseconds()))
 }
