@@ -142,7 +142,7 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 func process0(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
 	return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
 		Status:  buildSkipped,
-		Message: sqlValid("this version of Go is not reproducible"),
+		Message: sqlValid("this version of Go does not support reproducible builds"),
 	})
 }
 
