@@ -119,8 +119,9 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 			Message: sqlValid("unable to parse module version"),
 		})
 	}
-	if version.GOOS == "darwin" {
-		fixedHash, err := getFixedHash(ctx, version, expectedHash, toolchain.StripDarwinSig)
+	hashFixer := toolchain.HashFixerFor(version)
+	if hashFixer != nil {
+		fixedHash, err := getFixedHash(ctx, version, expectedHash, hashFixer)
 		if err != nil {
 			return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
 				Status:  buildFailed,
@@ -130,16 +131,16 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 		expectedHash = fixedHash
 	}
 	if goversion.Compare(version.GoVersion, "go1.21.0") < 0 {
-		return process0(ctx, db, version, expectedHash)
+		return process0(ctx, db, version, expectedHash, hashFixer)
 	} else if goversion.Compare(version.GoVersion, "go1.24.0") < 0 {
-		return process1(ctx, db, version, expectedHash)
+		return process1(ctx, db, version, expectedHash, hashFixer)
 	} else {
-		return process2(ctx, db, version, expectedHash)
+		return process2(ctx, db, version, expectedHash, hashFixer)
 	}
 }
 
 // process a non-reproducible toolchain (prior to Go 1.21)
-func process0(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
+func process0(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
 		Status:  buildSkipped,
 		Message: sqlValid("this version of Go does not support reproducible builds"),
@@ -147,7 +148,7 @@ func process0(ctx context.Context, db *sql.DB, version toolchain.Version, expect
 }
 
 // process a toolchain (Go 1.21 - 1.23) that can be reproduced with a non-reproducible Go 1.20 bootstrap toolchain
-func process1(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
+func process1(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	if Go120Object == "" || Go120Hash == "" {
 		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
 			Status:  buildSkipped,
@@ -158,11 +159,11 @@ func process1(ctx context.Context, db *sql.DB, version toolchain.Version, expect
 	if err != nil {
 		return fmt.Errorf("error presigning bootstrap download: %w", err)
 	}
-	return build(ctx, db, version, expectedHash, bootstrapURL, Go120Hash)
+	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, Go120Hash)
 }
 
 // process a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
-func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string) error {
+func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	bootstrapVersion := toolchain.Version{
 		GoVersion: toolchain.BootstrapToolchain(version.GoVersion),
 		GOOS:      "linux",
@@ -191,10 +192,10 @@ func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expect
 		})
 	}
 
-	return build(ctx, db, version, expectedHash, toolchainURL(bootstrapVersion), formatHash1(bootstrapSHA256))
+	return build(ctx, db, version, expectedHash, hashFixer, toolchainURL(bootstrapVersion), formatHash1(bootstrapSHA256))
 }
 
-func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, bootstrapURL string, bootstrapHash string) error {
+func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer, bootstrapURL string, bootstrapHash string) error {
 	sourceURL, err := SaveSource(ctx, db, version.GoVersion)
 	if err != nil {
 		return fmt.Errorf("error saving source code: %w", err)
@@ -246,7 +247,7 @@ func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedH
 	} else if lambdaResult.FunctionError != nil {
 		result.Status = buildFailed
 		result.Message = sqlValid(string(lambdaResult.Payload))
-	} else if isEqual, err := compare(ctx, zipObj, expectedHash); err != nil {
+	} else if isEqual, err := compare(ctx, zipObj, expectedHash, hashFixer); err != nil {
 		result.Status = buildFailed
 		result.Message = sqlValid(err.Error())
 	} else if isEqual {
@@ -260,7 +261,7 @@ func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedH
 	return storeBuildResult(ctx, db, version.ModVersion(), result)
 }
 
-func compare(ctx context.Context, zipObj string, expectedHash string) (bool, error) {
+func compare(ctx context.Context, zipObj string, expectedHash string, hashFixer toolchain.HashFixer) (bool, error) {
 	toolchainReader, err := getObject(ctx, zipObj)
 	if err != nil {
 		return false, fmt.Errorf("error downloading built toolchain: %w", err)
@@ -273,7 +274,7 @@ func compare(ctx context.Context, zipObj string, expectedHash string) (bool, err
 	}
 	defer os.Remove(toolchainFilename)
 
-	gotHash, err := dirhash.HashZip(toolchainFilename, dirhash.Hash1)
+	gotHash, err := toolchain.HashZip(toolchainFilename, dirhash.Hash1, hashFixer)
 	if err != nil {
 		return false, fmt.Errorf("error hashing built toolchain: %w", err)
 	}

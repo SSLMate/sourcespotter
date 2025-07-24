@@ -67,6 +67,13 @@ import (
 // signatures that cannot be reproduced without the signing keys.
 type HashFixer = func(string, []byte) ([]byte, error)
 
+func HashFixerFor(v Version) HashFixer {
+	if v.GOOS == "darwin" {
+		return StripDarwinSig
+	}
+	return nil
+}
+
 // HashZip returns the sumdb dirhash of the file content in the named zip file.
 // Only the file names and their contents are included in the hash:
 // the exact zip file format encoding, compression method,
