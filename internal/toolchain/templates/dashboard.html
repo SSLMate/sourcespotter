@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+<!--
+        Copyright (C) 2025 Opsmate, Inc.
+
+        This Source Code Form is subject to the terms of the Mozilla
+        Public License, v. 2.0. If a copy of the MPL was not distributed
+        with this file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+        This software is distributed WITHOUT A WARRANTY OF ANY KIND.
+        See the Mozilla Public License for details.
+-->
+<head>
+        <meta charset="UTF-8"/>
+        <title>Toolchain Builds</title>
+        <style>
+                html, body { background: white; color: black; }
+                html { margin: 0; padding: 0; }
+                body { margin: 0; padding: 2rem; }
+                h1 { margin-top: 0; }
+                a { color: black; text-decoration: underline; }
+                table {
+                        border: solid black 1px;
+                        border-collapse: collapse;
+                }
+                td, th {
+                        border: solid black 1px;
+                        padding: 0.3rem 0.4rem;
+                        text-align: left;
+                }
+                code {
+                        background: #f3f3f3;
+                        border: solid #e3e3e3 1px;
+                        border-radius: 2px;
+                        padding: 1px 3px;
+						white-space: nowrap;
+                }
+                section {
+                        margin: 2rem 0;
+                }
+                .versions {
+                        column-width: 20rem;
+                        column-gap: 1rem;
+                        list-style: none;
+                        padding: 0;
+                        margin: 0;
+						line-height: 1.6rem;
+                }
+                .version {
+                        font-style: italic;
+                }
+				h2, summary.h2 {
+					font-size: 140%;
+					font-weight: bold;
+					margin: 0 0 0.75em 0;
+				}
+        </style>
+</head>
+<body>
+        <h1>Toolchain Builds</h1>
+
+        <section>
+				<details>
+					<summary class="h2">Verified Reproducible ({{ len .Verified }})</summary>
+					<ul class="versions">
+							{{ range .Verified }}
+									<li>{{ . }}</li>
+							{{ end }}
+					</ul>
+				</details>
+        </section>
+        <section>
+				<details {{ if .Failures }} open {{ end }}>
+					<summary class="h2">Failures ({{ len .Failures }})</summary>
+					<table>
+							<thead>
+									<tr><th>Version</th><th>Status</th><th>Time (UTC)</th><th>Artifacts</th></tr>
+							</thead>
+							<tbody>
+									{{ range .Failures }}
+											<tr>
+													<td>{{ .Version }}</td>
+													<td>{{ .StatusString }}</td>
+													<td>{{ .InsertedAtString }}</td>
+													<td>
+															{{ if .LogURL }}<a href="{{ .LogURL }}">log</a>{{ end }}
+															{{ if .ZipURL }}<a href="{{ .ZipURL }}">zip</a>{{ end }}
+													</td>
+											</tr>
+									{{ end }}
+							</tbody>
+					</table>
+				</details>
+        </section>
+        <section>
+				<details>
+					<summary class="h2">Sources ({{ len .Sources }})</summary>
+					<p>
+						Source Spotter has used the following source tarballs:
+					</p>
+					<table>
+							<thead>
+									<tr><th>Version</th><th>SHA-256</th><th>Download Time (UTC)</th></tr>
+							</thead>
+							<tbody>
+									{{ range .Sources }}
+											<tr>
+													<td><a href="{{ .URL }}">{{ .Version }}</a></td>
+													<td><code>{{ .SHA256String }}</code></td>
+													<td>{{ .DownloadedAtString }}</td>
+											</tr>
+									{{ end }}
+							</tbody>
+					</table>
+				</details>
+        </section>
+        <section>
+                <h2>Credits</h2>
+                <p>
+                        Source Spotter is developed by <a href="https://sslmate.com/">SSLMate</a>,
+                        the creator of the <a href="https://sslmate.com/certspotter/">Cert Spotter Certificate Transparency Monitor</a>.
+                </p>
+                {{ if .BuildInfo }}
+                        <p class="version">{{ .BuildInfo.Main.Path }}@{{ .BuildInfo.Main.Version }} ({{ .BuildInfo.Main.Sum }})</p>
+                {{ end }}
+        </section>
+</body>
+</html>
