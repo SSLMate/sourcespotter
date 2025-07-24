@@ -35,6 +35,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"golang.org/x/mod/sumdb/dirhash"
@@ -126,6 +127,9 @@ func downloadToolchain(ctx context.Context, zipURL string, expectedHash string) 
 	if err := os.CopyFS(tempdir, fsys); err != nil {
 		return "", fmt.Errorf("error unzipping toolchain: %w", err)
 	}
+	if err := renameGoModFiles(tempdir); err != nil {
+		return "", err
+	}
 	return tempdir, nil
 }
 
@@ -135,6 +139,22 @@ func uploadFile(ctx context.Context, url, path string) error {
 		return err
 	}
 	return httpclient.Upload(ctx, url, bytes.NewReader(f))
+}
+
+func renameGoModFiles(root string) error {
+	return filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			return nil
+		}
+		if d.Name() == "_go.mod" {
+			newPath := filepath.Join(filepath.Dir(path), "go.mod")
+			return os.Rename(path, newPath)
+		}
+		return nil
+	})
 }
 
 func main() {
