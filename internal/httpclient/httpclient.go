@@ -78,11 +78,12 @@ func DownloadToTempFile(ctx context.Context, getURL string) (string, error) {
 	return filename, nil
 }
 
-func Upload(ctx context.Context, uploadURL string, body io.Reader) error {
+func Upload(ctx context.Context, uploadURL string, contentType string, body io.Reader) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, body)
 	if err != nil {
 		return err
 	}
+	req.Header.Set("Content-Type", contentType)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err

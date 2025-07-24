@@ -79,11 +79,11 @@ func handler(ctx context.Context, event toolchainlambda.Event) error {
 	var errs []error
 	if zipPath, err := toolchain.Build(ctx, input); err != nil {
 		errs = append(errs, fmt.Errorf("build failed: %w", err))
-	} else if err := uploadFile(ctx, event.ZipUploadURL, zipPath); err != nil {
+	} else if err := uploadFile(ctx, event.ZipUploadURL, toolchainlambda.ZipContentType, zipPath); err != nil {
 		errs = append(errs, fmt.Errorf("uploading zip failed: %w", err))
 	}
 
-	if err := httpclient.Upload(ctx, event.LogUploadURL, &logBuf); err != nil {
+	if err := httpclient.Upload(ctx, event.LogUploadURL, toolchainlambda.LogContentType, &logBuf); err != nil {
 		errs = append(errs, fmt.Errorf("uploading log failed: %w", err))
 	}
 
@@ -133,12 +133,12 @@ func downloadToolchain(ctx context.Context, zipURL string, expectedHash string) 
 	return tempdir, nil
 }
 
-func uploadFile(ctx context.Context, url, path string) error {
+func uploadFile(ctx context.Context, url, contentType, path string) error {
 	f, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
-	return httpclient.Upload(ctx, url, bytes.NewReader(f))
+	return httpclient.Upload(ctx, url, contentType, bytes.NewReader(f))
 }
 
 func renameGoModFiles(root string) error {

@@ -214,12 +214,12 @@ func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedH
 		zipObj = fmt.Sprintf("out/%s.%x.zip", version.ModVersion(), buildID)
 		logObj = fmt.Sprintf("out/%s.%x.log", version.ModVersion(), buildID)
 	)
-	if url, err := presignPutObject(ctx, zipObj); err != nil {
+	if url, err := presignPutObject(ctx, zipObj, toolchainlambda.ZipContentType); err != nil {
 		return fmt.Errorf("error presigning zip upload: %w", err)
 	} else {
 		lambdaEvent.ZipUploadURL = url
 	}
-	if url, err := presignPutObject(ctx, logObj); err != nil {
+	if url, err := presignPutObject(ctx, logObj, toolchainlambda.LogContentType); err != nil {
 		return fmt.Errorf("error presigning log upload: %w", err)
 	} else {
 		lambdaEvent.LogUploadURL = url
