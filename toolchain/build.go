@@ -83,7 +83,7 @@ func (b *BuildInput) build(ctx context.Context) (string, error) {
 		"GOOS=" + b.Version.GOOS,
 		"GOARCH=" + b.Version.GOARCH,
 	}
-	if b.Version.GOOS == "linux" && b.Version.GOARCH == "arm" {
+	if b.Version.GOOS == "linux" && b.Version.GOARCH == "arm" && b.Version.GoVersion != "go1.21.0" {
 		env = append(env, "GOARM=6")
 	}
 	if err := b.buildSource(ctx, goroot, []string{"-distpack"}, env); err != nil {
