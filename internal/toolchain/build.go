@@ -91,7 +91,7 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 				})
 			}
 			g.Go(func() error {
-				if err := Audit(ctx, db, version, formatHash1(sha256)); err != nil {
+				if err := process(ctx, db, version, formatHash1(sha256)); err != nil {
 					return fmt.Errorf("error building %s: %w", version, err)
 				}
 				return nil
@@ -102,8 +102,16 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 	return g.Wait()
 }
 
-// Audit checks that the building the given toolchain results in the given checksum
-func Audit(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
+func Audit(ctx context.Context, db *sql.DB, modversion string) error {
+	var sha256 []byte
+	if err := db.QueryRowContext(ctx, `SELECT source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND version = $1`, modversion).Scan(&sha256); err != nil {
+		return err
+	}
+	return process(ctx, db, modversion, formatHash1(sha256))
+}
+
+// process checks that the building the given toolchain results in the given checksum
+func process(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
 	version, ok := toolchain.ParseModVersion(modversion)
 	if !ok {
 		return storeBuildResult(ctx, db, modversion, &buildResult{

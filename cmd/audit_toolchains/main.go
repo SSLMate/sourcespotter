@@ -79,7 +79,7 @@ func main() {
 	toolchain.Go120Hash = flags.go120Hash
 
 	//if err := toolchain.AuditAll(context.Background(), db); err != nil {
-	if err := toolchain.Audit(context.Background(), db, flag.Arg(0), flag.Arg(1)); err != nil {
+	if err := toolchain.Audit(context.Background(), db, flag.Arg(0)); err != nil {
 		log.Fatal(err)
 	}
 }
