@@ -57,13 +57,13 @@ func saveSource(ctx context.Context, goversion string, url string) ([]byte, erro
 	client := newS3Client()
 	key := sourceObjectName(goversion)
 	if _, err := client.PutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(S3Bucket),
+		Bucket: aws.String(Bucket),
 		Key:    aws.String(key),
 		Body:   bytes.NewReader(source),
 	}); err != nil {
 		return nil, err
 	}
-	log.Printf("saved Go source %s to S3 bucket %s", goversion, S3Bucket)
+	log.Printf("saved Go source %s to S3 bucket %s", goversion, Bucket)
 
 	return sum[:], nil
 }

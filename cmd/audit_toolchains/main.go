@@ -72,11 +72,11 @@ func main() {
 		log.Fatal(err)
 	}
 	toolchain.AWSConfig = cfg
-	toolchain.S3Bucket = flags.s3bucket
+	toolchain.Bucket = flags.s3bucket
 	toolchain.LambdaArch = flags.lambdaArch
 	toolchain.LambdaFunc = flags.lambdaFunc
-	toolchain.Go120Object = flags.go120Object
-	toolchain.Go120Hash = flags.go120Hash
+	toolchain.BootstrapToolchain = flags.go120Object
+	toolchain.BootstrapHash = flags.go120Hash
 
 	if err := toolchain.AuditAll(context.Background(), db); err != nil {
 	//if err := toolchain.Audit(context.Background(), db, flag.Arg(0)); err != nil {

@@ -54,8 +54,8 @@ import (
 )
 
 var (
-	Go120Object string
-	Go120Hash   string
+	BootstrapToolchain string
+	BootstrapHash      string
 )
 
 // AuditAll tries auditing all toolchains in the sumdb that haven't already been built
@@ -159,17 +159,17 @@ func skip(ctx context.Context, db *sql.DB, modversion string) error {
 
 // audit a toolchain (Go 1.21 - 1.23) that can be reproduced with a non-reproducible Go 1.20 bootstrap toolchain
 func auditLegacy(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
-	if Go120Object == "" || Go120Hash == "" {
+	if BootstrapToolchain == "" || BootstrapHash == "" {
 		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
 			Status:  buildSkipped,
 			Message: sqlValid("Go 1.20 bootstrap toolchain not configured"),
 		})
 	}
-	bootstrapURL, err := presignGetObject(ctx, Go120Object)
+	bootstrapURL, err := presignGetObject(ctx, BootstrapToolchain)
 	if err != nil {
 		return fmt.Errorf("error presigning bootstrap download: %w", err)
 	}
-	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, Go120Hash)
+	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, BootstrapHash)
 }
 
 func modernBootstrapLang(goversion string) string {

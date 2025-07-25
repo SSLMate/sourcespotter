@@ -37,7 +37,7 @@ import (
 
 var (
 	AWSConfig  aws.Config
-	S3Bucket   string
+	Bucket     string
 	LambdaArch string
 	LambdaFunc string
 )
@@ -56,7 +56,7 @@ func newLambdaClient() *lambda.Client {
 func presignPutObject(ctx context.Context, objectName string, contentType string) (string, error) {
 	presigner := s3.NewPresignClient(newS3Client())
 	presigned, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(S3Bucket),
+		Bucket: aws.String(Bucket),
 		Key:    aws.String(objectName),
 		ContentType:    aws.String(contentType),
 	}, s3.WithPresignExpires(30*time.Minute))
@@ -69,7 +69,7 @@ func presignPutObject(ctx context.Context, objectName string, contentType string
 func presignGetObject(ctx context.Context, objectName string) (string, error) {
 	presigner := s3.NewPresignClient(newS3Client())
 	presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(S3Bucket),
+		Bucket: aws.String(Bucket),
 		Key:    aws.String(objectName),
 	}, s3.WithPresignExpires(30*time.Minute))
 	if err != nil {
@@ -80,7 +80,7 @@ func presignGetObject(ctx context.Context, objectName string) (string, error) {
 
 func getObject(ctx context.Context, objectName string) (io.ReadCloser, error) {
 	out, err := newS3Client().GetObject(ctx, &s3.GetObjectInput{
-		Bucket: aws.String(S3Bucket),
+		Bucket: aws.String(Bucket),
 		Key:    aws.String(objectName),
 	})
 	if err != nil {
@@ -91,7 +91,7 @@ func getObject(ctx context.Context, objectName string) (io.ReadCloser, error) {
 
 func deleteObject(ctx context.Context, objectName string) error {
 	_, err := newS3Client().DeleteObject(ctx, &s3.DeleteObjectInput{
-		Bucket: aws.String(S3Bucket),
+		Bucket: aws.String(Bucket),
 		Key:    aws.String(objectName),
 	})
 	return err
