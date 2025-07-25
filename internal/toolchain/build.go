@@ -34,10 +34,12 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	goversion "go/version"
+	goversionpkg "go/version"
 	"log"
 	"os"
 	"slices"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -130,9 +132,9 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 		}
 		expectedHash = fixedHash
 	}
-	if goversion.Compare(version.GoVersion, "go1.21.0") < 0 {
+	if goversionpkg.Compare(version.GoVersion, "go1.21") < 0 {
 		return process0(ctx, db, version, expectedHash, hashFixer)
-	} else if goversion.Compare(version.GoVersion, "go1.24.0") < 0 {
+	} else if goversionpkg.Compare(version.GoVersion, "go1.24") < 0 {
 		return process1(ctx, db, version, expectedHash, hashFixer)
 	} else {
 		return process2(ctx, db, version, expectedHash, hashFixer)
@@ -162,37 +164,89 @@ func process1(ctx context.Context, db *sql.DB, version toolchain.Version, expect
 	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, Go120Hash)
 }
 
-// process a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
-func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
-	bootstrapVersion := toolchain.Version{
-		GoVersion: toolchain.BootstrapToolchain(version.GoVersion),
-		GOOS:      "linux",
-		GOARCH:    LambdaArch,
+func modernBootstrapLang(goversion string) string {
+	// For Go >= 1.24: Go version 1.N will require a Go 1.M compiler, where M is N-2 rounded down to an even number. Example: Go 1.24 and 1.25 require Go 1.22.
+	goversion = goversionpkg.Lang(goversion)
+	goversion, ok := strings.CutPrefix(goversion, "go1.")
+	if !ok {
+		return ""
 	}
-	var (
-		bootstrapSHA256 []byte
-		bootstrapStatus sql.Null[buildStatus]
-	)
-	if err := db.QueryRowContext(ctx, `
-		SELECT record.source_sha256, toolchain_build.status
+	n, _ := strconv.Atoi(goversion)
+	if n < 24 {
+		return ""
+	}
+	m := (n - 2) & ^1
+	return fmt.Sprintf("go1.%d", m)
+}
+
+func pickModernBootstrapToolchain(ctx context.Context, db *sql.DB, lang string, goos string, goarch string) (string, string, buildStatus, error) {
+	var rows []struct {
+		Version string                `sql:"version"`
+		SHA256  []byte                `sql:"source_sha256"`
+		Status  sql.Null[buildStatus] `sql:"status"`
+	}
+	pattern := fmt.Sprintf("v0.0.1-%s.%%.%s-%s", lang, goos, goarch)
+	if err := dbutil.QueryAll(ctx, db, &rows, `
+		SELECT record.version, record.source_sha256, toolchain_build.status
 		FROM record
 		LEFT JOIN toolchain_build USING (version)
-		WHERE record.module = 'golang.org/toolchain' AND record.version = $1
-	`, bootstrapVersion.ModVersion()).Scan(&bootstrapSHA256, &bootstrapStatus); err == sql.ErrNoRows {
-		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
-			Status:  buildFailed,
-			Message: sqlValid(fmt.Sprintf("bootstrap toolchain %q not found in module database", bootstrapVersion.ModVersion())),
-		})
-	} else if err != nil {
-		return fmt.Errorf("error looking up bootstrap toolchain %q: %w", bootstrapVersion.ModVersion(), err)
-	} else if bootstrapStatus.V != buildEqual {
-		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
-			Status:  buildFailed,
-			Message: sqlValid(fmt.Sprintf("bootstrap toolchain %q not verified to be reproducible", bootstrapVersion.ModVersion())),
-		})
+		WHERE record.module = 'golang.org/toolchain' AND record.version LIKE $1
+	`, pattern); err != nil {
+		return "", "", "", err
 	}
 
-	return build(ctx, db, version, expectedHash, hashFixer, toolchainURL(bootstrapVersion), formatHash1(bootstrapSHA256))
+	var (
+		highestVersion       string
+		highestVersionSHA256 []byte
+		highestVersionStatus buildStatus
+	)
+	for _, row := range rows {
+		version, ok := toolchain.ParseModVersion(row.Version)
+		if !ok {
+			continue
+		}
+		if goversionpkg.Compare(version.GoVersion, highestVersion) > 0 {
+			highestVersion = version.GoVersion
+			highestVersionSHA256 = row.SHA256
+			highestVersionStatus = row.Status.V
+		}
+	}
+	return highestVersion, formatHash1(highestVersionSHA256), highestVersionStatus, nil
+}
+
+// process a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
+func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
+	var (
+		bootstrapOS   = "linux"
+		bootstrapArch = LambdaArch
+		bootstrapLang = modernBootstrapLang(version.GoVersion)
+	)
+	if bootstrapLang == "" {
+		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			Status:  buildFailed,
+			Message: sqlValid(fmt.Sprintf("unable to determine language version needed to bootstrap %s", version.GoVersion)),
+		})
+	}
+	bootstrapGoVersion, bootstrapHash, bootstrapStatus, err := pickModernBootstrapToolchain(ctx, db, bootstrapLang, bootstrapOS, bootstrapArch)
+	if err != nil {
+		return fmt.Errorf("error picking bootstrap toolchain: %w", err)
+	} else if bootstrapGoVersion == "" {
+		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			Status:  buildFailed,
+			Message: sqlValid(fmt.Sprintf("unable to find a bootstrap toolchain for %s (%s-%s)", bootstrapLang, bootstrapOS, bootstrapArch)),
+		})
+	} else if bootstrapStatus != buildEqual {
+		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			Status:  buildFailed,
+			Message: sqlValid(fmt.Sprintf("bootstrap toolchain %s (%s-%s) not verified to be reproducible", bootstrapGoVersion, bootstrapOS, bootstrapArch)),
+		})
+	}
+	bootstrapURL := toolchainURL(toolchain.Version{
+		GoVersion: bootstrapGoVersion,
+		GOOS:      bootstrapOS,
+		GOARCH:    bootstrapArch,
+	})
+	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, bootstrapHash)
 }
 
 func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer, bootstrapURL string, bootstrapHash string) error {
