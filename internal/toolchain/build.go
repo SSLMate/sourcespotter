@@ -114,6 +114,13 @@ func Audit(ctx context.Context, db *sql.DB, modversion string) error {
 
 // process checks that the building the given toolchain results in the given checksum
 func process(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
+	if strings.HasPrefix(modversion, "v0.0.1-go1.9.2rc2.") {
+		// go1.9.2rc2 is not a valid Go version, so ParseModVersion fails
+		// This version was released by mistake; see https://github.com/golang/go/issues/68634#issuecomment-2867535846
+		// But go1.9.x isn't expected to be reproducible anyways so just skip it
+		return process0(ctx, db, modversion)
+	}
+
 	version, ok := toolchain.ParseModVersion(modversion)
 	if !ok {
 		return storeBuildResult(ctx, db, modversion, &buildResult{
@@ -133,7 +140,7 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 		expectedHash = fixedHash
 	}
 	if goversionpkg.Compare(version.GoVersion, "go1.21") < 0 {
-		return process0(ctx, db, version, expectedHash, hashFixer)
+		return process0(ctx, db, modversion)
 	} else if goversionpkg.Compare(version.GoVersion, "go1.24") < 0 {
 		return process1(ctx, db, version, expectedHash, hashFixer)
 	} else {
@@ -142,8 +149,8 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 }
 
 // process a non-reproducible toolchain (prior to Go 1.21)
-func process0(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
-	return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+func process0(ctx context.Context, db *sql.DB, modversion string) error {
+	return storeBuildResult(ctx, db, modversion, &buildResult{
 		Status:  buildSkipped,
 		Message: sqlValid("this version of Go does not support reproducible builds"),
 	})
