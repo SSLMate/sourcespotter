@@ -47,6 +47,7 @@ import (
 	"golang.org/x/mod/semver"
 	"golang.org/x/mod/sumdb/dirhash"
 	"golang.org/x/sync/errgroup"
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/httpclient"
 	toolchainlambda "software.sslmate.com/src/sourcespotter/internal/toolchain/lambda"
 	"software.sslmate.com/src/sourcespotter/toolchain"
@@ -59,7 +60,7 @@ var (
 )
 
 // AuditAll tries auditing all toolchains in the sumdb that haven't already been built
-func AuditAll(ctx context.Context, db *sql.DB) error {
+func AuditAll(ctx context.Context) error {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
 	g.Go(func() error {
@@ -68,7 +69,7 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 			SHA256  []byte `sql:"source_sha256"`
 		}
 		var toolchains []toolchainModule
-		if err := dbutil.QueryAll(ctx, db, &toolchains, `SELECT version, source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND NOT(EXISTS(SELECT 1 FROM toolchain_build WHERE toolchain_build.version = record.version))`); err != nil {
+		if err := dbutil.QueryAll(ctx, sourcespotter.DB, &toolchains, `SELECT version, source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND NOT(EXISTS(SELECT 1 FROM toolchain_build WHERE toolchain_build.version = record.version))`); err != nil {
 			return fmt.Errorf("error querying unbuilt toolchains: %w", err)
 		}
 		slices.SortFunc(toolchains, func(a, b toolchainModule) int { return semver.Compare(a.Version, b.Version) })
@@ -87,13 +88,13 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 				i++
 			}
 			if inconsistent {
-				return storeBuildResult(ctx, db, version, &buildResult{
+				return storeBuildResult(ctx, version, &buildResult{
 					Status:  buildFailed,
 					Message: sqlValid("sumdb contains more than one checksum for this toolchain"),
 				})
 			}
 			g.Go(func() error {
-				if err := audit(ctx, db, version, formatHash1(sha256)); err != nil {
+				if err := audit(ctx, version, formatHash1(sha256)); err != nil {
 					return fmt.Errorf("error building %s: %w", version, err)
 				}
 				return nil
@@ -105,26 +106,26 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 }
 
 // Audit checks that the building the given toolchain results in the checksum published in the sumdb
-func Audit(ctx context.Context, db *sql.DB, modversion string) error {
+func Audit(ctx context.Context, modversion string) error {
 	var sha256 []byte
-	if err := db.QueryRowContext(ctx, `SELECT source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND version = $1`, modversion).Scan(&sha256); err != nil {
+	if err := sourcespotter.DB.QueryRowContext(ctx, `SELECT source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND version = $1`, modversion).Scan(&sha256); err != nil {
 		return err
 	}
-	return audit(ctx, db, modversion, formatHash1(sha256))
+	return audit(ctx, modversion, formatHash1(sha256))
 }
 
 // audit checks that the building the given toolchain results in the given checksum
-func audit(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
+func audit(ctx context.Context, modversion string, expectedHash string) error {
 	if strings.HasPrefix(modversion, "v0.0.1-go1.9.2rc2.") {
 		// go1.9.2rc2 is not a valid Go version, so ParseModVersion fails
 		// This version was released by mistake; see https://github.com/golang/go/issues/68634#issuecomment-2867535846
 		// But go1.9.x isn't expected to be reproducible anyways so just skip it
-		return skip(ctx, db, modversion)
+		return skip(ctx, modversion)
 	}
 
 	version, ok := toolchain.ParseModVersion(modversion)
 	if !ok {
-		return storeBuildResult(ctx, db, modversion, &buildResult{
+		return storeBuildResult(ctx, modversion, &buildResult{
 			Status:  buildFailed,
 			Message: sqlValid("unable to parse module version"),
 		})
@@ -133,7 +134,7 @@ func audit(ctx context.Context, db *sql.DB, modversion string, expectedHash stri
 	if hashFixer != nil {
 		fixedHash, err := getFixedHash(ctx, version, expectedHash, hashFixer)
 		if err != nil {
-			return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+			return storeBuildResult(ctx, version.ModVersion(), &buildResult{
 				Status:  buildFailed,
 				Message: sqlValid(err.Error()),
 			})
@@ -141,26 +142,26 @@ func audit(ctx context.Context, db *sql.DB, modversion string, expectedHash stri
 		expectedHash = fixedHash
 	}
 	if goversionpkg.Compare(version.GoVersion, "go1.21") < 0 {
-		return skip(ctx, db, modversion)
+		return skip(ctx, modversion)
 	} else if goversionpkg.Compare(version.GoVersion, "go1.24") < 0 {
-		return auditLegacy(ctx, db, version, expectedHash, hashFixer)
+		return auditLegacy(ctx, version, expectedHash, hashFixer)
 	} else {
-		return auditModern(ctx, db, version, expectedHash, hashFixer)
+		return auditModern(ctx, version, expectedHash, hashFixer)
 	}
 }
 
 // skip a non-reproducible toolchain (prior to Go 1.21)
-func skip(ctx context.Context, db *sql.DB, modversion string) error {
-	return storeBuildResult(ctx, db, modversion, &buildResult{
+func skip(ctx context.Context, modversion string) error {
+	return storeBuildResult(ctx, modversion, &buildResult{
 		Status:  buildSkipped,
 		Message: sqlValid("this version of Go does not support reproducible builds"),
 	})
 }
 
 // audit a toolchain (Go 1.21 - 1.23) that can be reproduced with a non-reproducible Go 1.20 bootstrap toolchain
-func auditLegacy(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
+func auditLegacy(ctx context.Context, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	if BootstrapToolchain == "" || BootstrapHash == "" {
-		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+		return storeBuildResult(ctx, version.ModVersion(), &buildResult{
 			Status:  buildSkipped,
 			Message: sqlValid("Go 1.20 bootstrap toolchain not configured"),
 		})
@@ -169,7 +170,7 @@ func auditLegacy(ctx context.Context, db *sql.DB, version toolchain.Version, exp
 	if err != nil {
 		return fmt.Errorf("error presigning bootstrap download: %w", err)
 	}
-	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, BootstrapHash)
+	return build(ctx, version, expectedHash, hashFixer, bootstrapURL, BootstrapHash)
 }
 
 func modernBootstrapLang(goversion string) string {
@@ -187,14 +188,14 @@ func modernBootstrapLang(goversion string) string {
 	return fmt.Sprintf("go1.%d", m)
 }
 
-func pickModernBootstrapToolchain(ctx context.Context, db *sql.DB, lang string, goos string, goarch string) (string, string, buildStatus, error) {
+func pickModernBootstrapToolchain(ctx context.Context, lang string, goos string, goarch string) (string, string, buildStatus, error) {
 	var rows []struct {
 		Version string                `sql:"version"`
 		SHA256  []byte                `sql:"source_sha256"`
 		Status  sql.Null[buildStatus] `sql:"status"`
 	}
 	pattern := fmt.Sprintf("v0.0.1-%s.%%.%s-%s", lang, goos, goarch)
-	if err := dbutil.QueryAll(ctx, db, &rows, `
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &rows, `
 		SELECT record.version, record.source_sha256, toolchain_build.status
 		FROM record
 		LEFT JOIN toolchain_build USING (version)
@@ -223,28 +224,28 @@ func pickModernBootstrapToolchain(ctx context.Context, db *sql.DB, lang string, 
 }
 
 // audit a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
-func auditModern(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
+func auditModern(ctx context.Context, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	var (
 		bootstrapOS   = "linux"
 		bootstrapArch = LambdaArch
 		bootstrapLang = modernBootstrapLang(version.GoVersion)
 	)
 	if bootstrapLang == "" {
-		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+		return storeBuildResult(ctx, version.ModVersion(), &buildResult{
 			Status:  buildFailed,
 			Message: sqlValid(fmt.Sprintf("unable to determine language version needed to bootstrap %s", version.GoVersion)),
 		})
 	}
-	bootstrapGoVersion, bootstrapHash, bootstrapStatus, err := pickModernBootstrapToolchain(ctx, db, bootstrapLang, bootstrapOS, bootstrapArch)
+	bootstrapGoVersion, bootstrapHash, bootstrapStatus, err := pickModernBootstrapToolchain(ctx, bootstrapLang, bootstrapOS, bootstrapArch)
 	if err != nil {
 		return fmt.Errorf("error picking bootstrap toolchain: %w", err)
 	} else if bootstrapGoVersion == "" {
-		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+		return storeBuildResult(ctx, version.ModVersion(), &buildResult{
 			Status:  buildFailed,
 			Message: sqlValid(fmt.Sprintf("unable to find a bootstrap toolchain for %s (%s-%s)", bootstrapLang, bootstrapOS, bootstrapArch)),
 		})
 	} else if bootstrapStatus != buildEqual {
-		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
+		return storeBuildResult(ctx, version.ModVersion(), &buildResult{
 			Status:  buildFailed,
 			Message: sqlValid(fmt.Sprintf("bootstrap toolchain %s (%s-%s) not verified to be reproducible", bootstrapGoVersion, bootstrapOS, bootstrapArch)),
 		})
@@ -254,11 +255,11 @@ func auditModern(ctx context.Context, db *sql.DB, version toolchain.Version, exp
 		GOOS:      bootstrapOS,
 		GOARCH:    bootstrapArch,
 	})
-	return build(ctx, db, version, expectedHash, hashFixer, bootstrapURL, bootstrapHash)
+	return build(ctx, version, expectedHash, hashFixer, bootstrapURL, bootstrapHash)
 }
 
-func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer, bootstrapURL string, bootstrapHash string) error {
-	sourceURL, err := SaveSource(ctx, db, version.GoVersion)
+func build(ctx context.Context, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer, bootstrapURL string, bootstrapHash string) error {
+	sourceURL, err := SaveSource(ctx, version.GoVersion)
 	if err != nil {
 		return fmt.Errorf("error saving source code: %w", err)
 	}
@@ -320,7 +321,7 @@ func build(ctx context.Context, db *sql.DB, version toolchain.Version, expectedH
 	} else {
 		result.Status = buildUnequal
 	}
-	return storeBuildResult(ctx, db, version.ModVersion(), result)
+	return storeBuildResult(ctx, version.ModVersion(), result)
 }
 
 func compare(ctx context.Context, zipObj string, expectedHash string, hashFixer toolchain.HashFixer) (bool, error) {
@@ -382,8 +383,8 @@ type buildResult struct {
 	BuildDuration sql.Null[string]
 }
 
-func storeBuildResult(ctx context.Context, db *sql.DB, modversion string, result *buildResult) error {
-	_, err := db.ExecContext(ctx, `
+func storeBuildResult(ctx context.Context, modversion string, result *buildResult) error {
+	_, err := sourcespotter.DB.ExecContext(ctx, `
 		INSERT INTO toolchain_build (version, status, message, build_id, build_duration)
 		VALUES ($1, $2, $3, $4, $5)
 		ON CONFLICT (version)

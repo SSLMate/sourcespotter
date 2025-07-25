@@ -36,6 +36,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/httpclient"
 	"src.agwa.name/go-dbutil"
 )
@@ -68,8 +69,8 @@ func saveSource(ctx context.Context, goversion string, url string) ([]byte, erro
 	return sum[:], nil
 }
 
-func SaveSource(ctx context.Context, db *sql.DB, goversion string) (string, error) {
-	tx, err := db.BeginTx(ctx, nil)
+func SaveSource(ctx context.Context, goversion string) (string, error) {
+	tx, err := sourcespotter.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return "", fmt.Errorf("error starting database transaction: %w", err)
 	}

@@ -31,20 +31,24 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
-	"github.com/lib/pq"
-	"golang.org/x/sync/errgroup"
-	"html/template"
 	"log"
 	"net/http"
+	"os"
+	"strings"
+	"time"
+
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/lib/pq"
+	"golang.org/x/sync/errgroup"
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/records"
 	"software.sslmate.com/src/sourcespotter/internal/sths"
+	"software.sslmate.com/src/sourcespotter/internal/toolchain"
 	"src.agwa.name/go-dbutil"
 	"src.agwa.name/go-listener"
 	_ "src.agwa.name/go-listener/tls"
 	"src.agwa.name/go-util/logfilter"
-	"strings"
-	"time"
 )
 
 const (
@@ -55,10 +59,8 @@ const (
 )
 
 var (
-	db                *sql.DB
-	dbListener        *pq.Listener
-	dashboardTemplate *template.Template
-	sumdbSignals      = make(map[int32]signals)
+	dbListener   *pq.Listener
+	sumdbSignals = make(map[int32]signals)
 )
 
 type signals struct {
@@ -88,7 +90,7 @@ func (s signal) raise() {
 
 func downloadSTHs(ctx context.Context, id int32) error {
 	for {
-		if err := sths.Download(ctx, id, db); err != nil {
+		if err := sths.Download(ctx, id); err != nil {
 			return err
 		}
 		if err := sleep(ctx, downloadSTHInterval, nil); err != nil {
@@ -99,7 +101,7 @@ func downloadSTHs(ctx context.Context, id int32) error {
 
 func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{}) error {
 	for {
-		if err := sths.Audit(ctx, id, db); err != nil {
+		if err := sths.Audit(ctx, id); err != nil {
 			return err
 		}
 		if err := sleep(ctx, auditSTHInterval, newPositionSignal); err != nil {
@@ -110,7 +112,7 @@ func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{})
 
 func ingestRecords(ctx context.Context, id int32, newSTHSignal <-chan struct{}) error {
 	for {
-		if _, err := records.Ingest(ctx, id, db); err != nil {
+		if _, err := records.Ingest(ctx, id); err != nil {
 			return err
 		}
 		if err := sleep(ctx, ingestSleep, newSTHSignal); err != nil {
@@ -170,11 +172,11 @@ func handleNotification(n *pq.Notification) {
 func handleGossip(w http.ResponseWriter, req *http.Request) {
 	address := strings.TrimLeft(req.URL.Path, "/")
 	if address == "" {
-		dashboard.ServeHTTP(w, req, db, dashboardTemplate)
+		dashboard.ServeHTTP(w, req)
 	} else if req.Method == http.MethodGet {
-		sths.ServeGossip(address, w, req, db)
+		sths.ServeGossip(address, w, req)
 	} else if req.Method == http.MethodPost {
-		sths.ReceiveGossip(address, w, req, db)
+		sths.ReceiveGossip(address, w, req)
 	} else {
 		http.Error(w, "400 Use GET or POST please", 400)
 	}
@@ -182,44 +184,66 @@ func handleGossip(w http.ResponseWriter, req *http.Request) {
 
 func main() {
 	var flags struct {
-		db                string
-		dashboardTemplate string
-		listenGossip      []string
+		config       string
+		listenGossip []string
 	}
-	flag.StringVar(&flags.db, "db", "", "Database address")
-	flag.StringVar(&flags.dashboardTemplate, "dashboard-template", "", "Path to alternative dashboard template")
+	flag.StringVar(&flags.config, "config", "", "Path to configuration file")
 	flag.Func("listen-gossip", "Socket for gossip server, in go-listener syntax (repeatable)", func(arg string) error {
 		flags.listenGossip = append(flags.listenGossip, arg)
 		return nil
 	})
 	flag.Parse()
 
-	if flags.db == "" {
-		log.Fatal("-db flag not provided")
+	if flags.config == "" {
+		log.Fatal("-config flag not provided")
 	}
 
-	if ret, err := sql.Open("postgres", flags.db); err == nil {
-		db = ret
+	configData, err := os.ReadFile(flags.config)
+	if err != nil {
+		log.Fatal(err)
+	}
+	var cfg struct {
+		Domain    string
+		Database  string
+		Toolchain struct {
+			Bucket             string
+			BootstrapToolchain string
+			BootstrapHash      string
+			LambdaArch         string
+			LambdaFunc         string
+		}
+	}
+	if err := json.Unmarshal(configData, &cfg); err != nil {
+		log.Fatal(err)
+	}
+
+	sourcespotter.Domain = cfg.Domain
+
+	if db, err := sql.Open("postgres", cfg.Database); err == nil {
+		sourcespotter.DB = db
 	} else {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer sourcespotter.DB.Close()
 
-	dbListener = pq.NewListener(flags.db, 5*time.Second, 2*time.Minute, nil)
+	dbListener = pq.NewListener(cfg.Database, 5*time.Second, 2*time.Minute, nil)
 	if err := dbListener.Listen(dbChannelName); err != nil {
 		log.Fatal(err)
 	}
 
-	if flags.dashboardTemplate != "" {
-		if ret, err := template.ParseFiles(flags.dashboardTemplate); err == nil {
-			dashboardTemplate = ret
-		} else {
-			log.Fatal(err)
-		}
+	awsCfg, err := config.LoadDefaultConfig(context.Background())
+	if err != nil {
+		log.Fatal(err)
 	}
+	toolchain.AWSConfig = awsCfg
+	toolchain.Bucket = cfg.Toolchain.Bucket
+	toolchain.BootstrapToolchain = cfg.Toolchain.BootstrapToolchain
+	toolchain.BootstrapHash = cfg.Toolchain.BootstrapHash
+	toolchain.LambdaArch = cfg.Toolchain.LambdaArch
+	toolchain.LambdaFunc = cfg.Toolchain.LambdaFunc
 
 	var enabledSumDBs []int32
-	if err := dbutil.QueryAll(context.Background(), db, &enabledSumDBs, `SELECT db_id FROM db WHERE enabled ORDER BY db_id`); err != nil {
+	if err := dbutil.QueryAll(context.Background(), sourcespotter.DB, &enabledSumDBs, `SELECT db_id FROM db WHERE enabled ORDER BY db_id`); err != nil {
 		log.Fatal(err)
 	}
 

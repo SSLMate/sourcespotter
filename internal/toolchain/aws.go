@@ -56,9 +56,9 @@ func newLambdaClient() *lambda.Client {
 func presignPutObject(ctx context.Context, objectName string, contentType string) (string, error) {
 	presigner := s3.NewPresignClient(newS3Client())
 	presigned, err := presigner.PresignPutObject(ctx, &s3.PutObjectInput{
-		Bucket: aws.String(Bucket),
-		Key:    aws.String(objectName),
-		ContentType:    aws.String(contentType),
+		Bucket:      aws.String(Bucket),
+		Key:         aws.String(objectName),
+		ContentType: aws.String(contentType),
 	}, s3.WithPresignExpires(30*time.Minute))
 	if err != nil {
 		return "", err

@@ -35,6 +35,7 @@ import (
 
 	"github.com/lib/pq"
 	"software.sslmate.com/src/certspotter/merkletree"
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 	"src.agwa.name/go-dbutil"
 )
@@ -50,7 +51,6 @@ type nextSTH struct {
 
 type ingestState struct {
 	id             int32
-	db             *sql.DB
 	address        string
 	tree           merkletree.CollapsedTree
 	sths           []nextSTH
@@ -59,8 +59,9 @@ type ingestState struct {
 	pendingRecords int
 }
 
-func loadIngestState(ctx context.Context, id int32, db *sql.DB) (*ingestState, error) {
-	state := &ingestState{id: id, db: db}
+func loadIngestState(ctx context.Context, id int32) (*ingestState, error) {
+	state := &ingestState{id: id}
+	db := sourcespotter.DB
 	if err := db.QueryRowContext(ctx, `SELECT address, download_position FROM db WHERE db_id = $1`, id).Scan(&state.address, dbutil.JSON(&state.tree)); err != nil {
 		return nil, fmt.Errorf("error loading sumdb %d: %w", id, err)
 	}
@@ -78,7 +79,7 @@ func (state *ingestState) begin(ctx context.Context) error {
 		panic("ingestState.begin: begin already called")
 	}
 
-	tx, err := state.db.BeginTx(ctx, nil)
+	tx, err := sourcespotter.DB.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("error starting database transaction: %w", err)
 	}
@@ -188,11 +189,11 @@ func (state *ingestState) addRecord(ctx context.Context, record *sumdb.Record) e
 	return nil
 }
 
-func Ingest(ctx context.Context, id int32, db *sql.DB) (bool, error) {
+func Ingest(ctx context.Context, id int32) (bool, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	state, err := loadIngestState(ctx, id, db)
+	state, err := loadIngestState(ctx, id)
 	if err != nil {
 		return false, err
 	}

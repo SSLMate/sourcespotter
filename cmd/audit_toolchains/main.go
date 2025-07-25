@@ -34,6 +34,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	_ "github.com/lib/pq"
 
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/toolchain"
 )
 
@@ -65,6 +66,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	sourcespotter.DB = db
 	defer db.Close()
 
 	cfg, err := config.LoadDefaultConfig(context.Background())
@@ -78,8 +80,8 @@ func main() {
 	toolchain.BootstrapToolchain = flags.go120Object
 	toolchain.BootstrapHash = flags.go120Hash
 
-	if err := toolchain.AuditAll(context.Background(), db); err != nil {
-	//if err := toolchain.Audit(context.Background(), db, flag.Arg(0)); err != nil {
+	if err := toolchain.AuditAll(context.Background()); err != nil {
+		//if err := toolchain.Audit(context.Background(), db, flag.Arg(0)); err != nil {
 		log.Fatal(err)
 	}
 }

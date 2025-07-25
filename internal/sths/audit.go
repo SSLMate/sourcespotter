@@ -28,8 +28,9 @@ package sths
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
+
+	"software.sslmate.com/src/sourcespotter"
 )
 
 const auditStmt = `
@@ -45,12 +46,12 @@ const auditStmt = `
 		sth.tree_size <= $2
 `
 
-func Audit(ctx context.Context, sumdbid int32, db *sql.DB) error {
+func Audit(ctx context.Context, sumdbid int32) error {
 	var verifiedSize uint64
-	if err := db.QueryRowContext(ctx, `SELECT coalesce((verified_position->>'size')::bigint, 0) FROM db WHERE db_id = $1`, sumdbid).Scan(&verifiedSize); err != nil {
+	if err := sourcespotter.DB.QueryRowContext(ctx, `SELECT coalesce((verified_position->>'size')::bigint, 0) FROM db WHERE db_id = $1`, sumdbid).Scan(&verifiedSize); err != nil {
 		return fmt.Errorf("error loading verified position of sumdb %d: %w", sumdbid, err)
 	}
-	if _, err := db.ExecContext(ctx, auditStmt, sumdbid, verifiedSize); err != nil {
+	if _, err := sourcespotter.DB.ExecContext(ctx, auditStmt, sumdbid, verifiedSize); err != nil {
 		return fmt.Errorf("error auditing STHs for sumdb %d: %w", sumdbid, err)
 	}
 	return nil

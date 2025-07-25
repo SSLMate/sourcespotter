@@ -34,13 +34,14 @@ import (
 	"net/http"
 
 	"software.sslmate.com/src/certspotter/merkletree"
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 )
 
-func ServeGossip(address string, w http.ResponseWriter, req *http.Request, db *sql.DB) {
+func ServeGossip(address string, w http.ResponseWriter, req *http.Request) {
 	var sth sumdb.STH
 	var rootHash []byte
-	if err := db.QueryRowContext(req.Context(), `SELECT sth.tree_size, sth.root_hash, sth.signature FROM db JOIN sth ON sth.db_id = db.db_id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &rootHash, &sth.Signature); err != nil {
+	if err := sourcespotter.DB.QueryRowContext(req.Context(), `SELECT sth.tree_size, sth.root_hash, sth.signature FROM db JOIN sth ON sth.db_id = db.db_id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &rootHash, &sth.Signature); err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Go Checksum Database Not Found", 404)
 		} else {
@@ -57,7 +58,7 @@ func ServeGossip(address string, w http.ResponseWriter, req *http.Request, db *s
 	fmt.Fprint(w, sth.Format(address))
 }
 
-func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db *sql.DB) {
+func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request) {
 	sthBytes, err := io.ReadAll(http.MaxBytesReader(w, req.Body, 100000))
 	if err != nil {
 		http.Error(w, "Reading your request failed: "+err.Error(), 400)
@@ -68,7 +69,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 		sumdbid int32
 		key     []byte
 	)
-	if err := db.QueryRowContext(req.Context(), `SELECT db_id, key FROM db WHERE address = $1`, address).Scan(&sumdbid, &key); err != nil {
+	if err := sourcespotter.DB.QueryRowContext(req.Context(), `SELECT db_id, key FROM db WHERE address = $1`, address).Scan(&sumdbid, &key); err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Go Checksum Database Not Found", 404)
 		} else {
@@ -84,13 +85,13 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 		return
 	}
 
-	if err := insert(req.Context(), db, sumdbid, sth, "gossip"); err != nil {
+	if err := insert(req.Context(), sumdbid, sth, "gossip"); err != nil {
 		log.Printf("ReceiveGossip: error inserting STH for sumdb %d: %s", sumdbid, err)
 		http.Error(w, "500 Internal Database Error", 500)
 		return
 	}
 
-	consistent, err := isConsistent(req.Context(), db, sumdbid, sth)
+	consistent, err := isConsistent(req.Context(), sumdbid, sth)
 	if err != nil {
 		log.Printf("ReceiveGossip: error querying consistency of STH for sumdb %d: %s", sumdbid, err)
 		http.Error(w, "500 Internal Database Error", 500)
@@ -109,7 +110,7 @@ func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request, db 
 	}
 }
 
-func isConsistent(ctx context.Context, db *sql.DB, sumdbid int32, sth *sumdb.STH) (consistent sql.NullBool, err error) {
-	err = db.QueryRowContext(ctx, `SELECT consistent FROM sth WHERE (db_id, tree_size, root_hash) = ($1, $2, $3)`, sumdbid, sth.TreeSize, sth.RootHash[:]).Scan(&consistent)
+func isConsistent(ctx context.Context, sumdbid int32, sth *sumdb.STH) (consistent sql.NullBool, err error) {
+	err = sourcespotter.DB.QueryRowContext(ctx, `SELECT consistent FROM sth WHERE (db_id, tree_size, root_hash) = ($1, $2, $3)`, sumdbid, sth.TreeSize, sth.RootHash[:]).Scan(&consistent)
 	return
 }

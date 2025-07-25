@@ -27,17 +27,17 @@ package sths
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"log"
 
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 )
 
-func Download(ctx context.Context, sumdbid int32, db *sql.DB) error {
+func Download(ctx context.Context, sumdbid int32) error {
 	var address string
 	var key []byte
-	if err := db.QueryRowContext(ctx, `SELECT address, key FROM db WHERE db_id = $1`, sumdbid).Scan(&address, &key); err != nil {
+	if err := sourcespotter.DB.QueryRowContext(ctx, `SELECT address, key FROM db WHERE db_id = $1`, sumdbid).Scan(&address, &key); err != nil {
 		return fmt.Errorf("error loading info for sumdb %d: %w", sumdbid, err)
 	}
 
@@ -47,7 +47,7 @@ func Download(ctx context.Context, sumdbid int32, db *sql.DB) error {
 		return nil
 	}
 
-	if err := insert(ctx, db, sumdbid, sth, "https://"+address+"/latest"); err != nil {
+	if err := insert(ctx, sumdbid, sth, "https://"+address+"/latest"); err != nil {
 		return fmt.Errorf("error inserting downloaded STH for sumdb %d: %w", sumdbid, err)
 	}
 

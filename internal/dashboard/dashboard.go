@@ -28,7 +28,6 @@ package dashboard
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"encoding/base64"
 	"html/template"
@@ -38,6 +37,7 @@ import (
 	"time"
 
 	"software.sslmate.com/src/certspotter/merkletree"
+	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 	"src.agwa.name/go-dbutil"
 )
@@ -107,10 +107,10 @@ type Dashboard struct {
 	BuildInfo        *debug.BuildInfo
 }
 
-func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
+func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 	dashboard := new(Dashboard)
 
-	if err := dbutil.QueryAll(ctx, db, &dashboard.SumDBs, `
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.SumDBs, `
 		SELECT
 			db.address AS "Address",
 			largest_sth.tree_size AS "LargestSTHSize",
@@ -127,7 +127,7 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 		return nil, err
 	}
 
-	if err := dbutil.QueryAll(ctx, db, &dashboard.InconsistentSTHs, `
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.InconsistentSTHs, `
 		SELECT
 			db.address AS "SumDB",
 			sth.tree_size AS "TreeSize",
@@ -143,7 +143,7 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 		return nil, err
 	}
 
-	if err := dbutil.QueryAll(ctx, db, &dashboard.DuplicateRecords, `
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.DuplicateRecords, `
 		SELECT
 			db.address AS "SumDB",
 			record.position AS "Position",
@@ -163,11 +163,8 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 	return dashboard, nil
 }
 
-func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB, template *template.Template) {
-	if template == nil {
-		template = defaultDashboardTemplate
-	}
-	dashboard, err := LoadDashboard(req.Context(), db)
+func ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	dashboard, err := LoadDashboard(req.Context())
 	if err != nil {
 		log.Printf("error loading dashboard: %s", err)
 		http.Error(w, "Internal Database Error", 500)
@@ -177,5 +174,5 @@ func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB, template *t
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Xss-Protection", "0")
 	w.WriteHeader(http.StatusOK)
-	template.Execute(w, dashboard)
+	defaultDashboardTemplate.Execute(w, dashboard)
 }

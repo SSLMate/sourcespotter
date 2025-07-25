@@ -27,7 +27,6 @@ package toolchain
 
 import (
 	"context"
-	"database/sql"
 	"embed"
 	"encoding/hex"
 	"fmt"
@@ -40,6 +39,7 @@ import (
 
 	"go/version"
 	"golang.org/x/mod/semver"
+	"software.sslmate.com/src/sourcespotter"
 	"src.agwa.name/go-dbutil"
 )
 
@@ -49,13 +49,13 @@ var content embed.FS
 var defaultDashboardTemplate = template.Must(template.ParseFS(content, "templates/dashboard.html"))
 
 type failureRow struct {
-	Version string `sql:"version"`
-	Status  string `sql:"status"`
-	Message string `sql:"message"`
-	BuildID []byte `sql:"build_id"`
+	Version    string    `sql:"version"`
+	Status     string    `sql:"status"`
+	Message    string    `sql:"message"`
+	BuildID    []byte    `sql:"build_id"`
 	InsertedAt time.Time `sql:"inserted_at"`
-	LogURL  string
-	ZipURL  string
+	LogURL     string
+	ZipURL     string
 }
 
 func (f *failureRow) StatusString() string {
@@ -92,15 +92,15 @@ type dashboard struct {
 	BuildInfo *debug.BuildInfo
 }
 
-func loadDashboard(ctx context.Context, db *sql.DB) (*dashboard, error) {
+func loadDashboard(ctx context.Context) (*dashboard, error) {
 	dash := new(dashboard)
-	if err := dbutil.QueryAll(ctx, db, &dash.Verified, `SELECT version FROM toolchain_build WHERE status='equal'`); err != nil {
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dash.Verified, `SELECT version FROM toolchain_build WHERE status='equal'`); err != nil {
 		return nil, err
 	}
 	semver.Sort(dash.Verified)
 
 	var failures []failureRow
-	if err := dbutil.QueryAll(ctx, db, &failures, `SELECT version,status,coalesce(message,'') AS message,build_id,inserted_at FROM toolchain_build WHERE status NOT IN ('equal', 'skipped') ORDER BY inserted_at DESC`); err != nil {
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &failures, `SELECT version,status,coalesce(message,'') AS message,build_id,inserted_at FROM toolchain_build WHERE status NOT IN ('equal', 'skipped') ORDER BY inserted_at DESC`); err != nil {
 		return nil, err
 	}
 	for i := range failures {
@@ -122,7 +122,7 @@ func loadDashboard(ctx context.Context, db *sql.DB) (*dashboard, error) {
 	}
 	dash.Failures = failures
 
-	if err := dbutil.QueryAll(ctx, db, &dash.Sources, `SELECT version,url,sha256,downloaded_at FROM toolchain_source`); err != nil {
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dash.Sources, `SELECT version,url,sha256,downloaded_at FROM toolchain_source`); err != nil {
 		return nil, err
 	}
 	slices.SortFunc(dash.Sources, func(a, b sourceRow) int {
@@ -133,11 +133,8 @@ func loadDashboard(ctx context.Context, db *sql.DB) (*dashboard, error) {
 	return dash, nil
 }
 
-func ServeDashboard(w http.ResponseWriter, req *http.Request, db *sql.DB, template *template.Template) {
-	if template == nil {
-		template = defaultDashboardTemplate
-	}
-	dash, err := loadDashboard(req.Context(), db)
+func ServeDashboard(w http.ResponseWriter, req *http.Request) {
+	dash, err := loadDashboard(req.Context())
 	if err != nil {
 		log.Printf("error loading toolchain dashboard: %s", err)
 		http.Error(w, "Internal Database Error", 500)
@@ -147,5 +144,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request, db *sql.DB, templa
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("X-Xss-Protection", "0")
 	w.WriteHeader(http.StatusOK)
-	template.Execute(w, dash)
+	defaultDashboardTemplate.Execute(w, dash)
 }
