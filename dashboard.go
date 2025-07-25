@@ -26,11 +26,9 @@
 package sourcespotter
 
 import (
-	"database/sql"
+	"net/http"
 )
 
-var (
-	DB        *sql.DB
-	DBAddress string
-	Domain    string
-)
+func ServeHome(w http.ResponseWriter, r *http.Request) {
+	// TODO
+}

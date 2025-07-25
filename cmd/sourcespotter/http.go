@@ -23,14 +23,39 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-package sourcespotter
+package main
 
 import (
-	"database/sql"
+	"log"
+	"net/http"
+	"time"
+
+	"software.sslmate.com/src/sourcespotter"
+	"software.sslmate.com/src/sourcespotter/internal/sths"
+	"software.sslmate.com/src/sourcespotter/internal/sumdb"
+	"software.sslmate.com/src/sourcespotter/internal/toolchain"
+	"src.agwa.name/go-util/logfilter"
 )
 
-var (
-	DB        *sql.DB
-	DBAddress string
-	Domain    string
-)
+func newHTTPServer() *http.Server {
+	domain := sourcespotter.Domain
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET "+domain+"/{$}", sourcespotter.ServeHome)
+	mux.HandleFunc("GET "+domain+"/sumdb/{$}", sumdb.ServeDashboard)
+	mux.HandleFunc("GET "+domain+"/toolchain/{$}", toolchain.ServeDashboard)
+	// TODO mux.HandleFunc("GET "+domain+"/toolchain/failures.atom", toolchain.ServeFailuresAtom)
+	// TODO mux.HandleFunc("GET "+domain+"/toolchain/sources.csv", toolchain.ServeSourcesCSV)
+	mux.HandleFunc("GET "+domain+"/sumdb/gossip/{address}", sths.ServeGossip)
+	mux.HandleFunc("POST "+domain+"/sumdb/gossip/{address}", sths.ReceiveGossip)
+	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
+	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
+
+	return &http.Server{
+		ReadTimeout:  5 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  3 * time.Second,
+		Handler:      mux,
+		ErrorLog:     logfilter.New(log.Default(), logfilter.HTTPServerErrors),
+	}
+}

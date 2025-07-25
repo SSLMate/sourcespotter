@@ -23,8 +23,7 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-// Package dashboard implements Source Spotter's HTML dashboard
-package dashboard
+package sumdb
 
 import (
 	"context"
@@ -163,7 +162,7 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 	return dashboard, nil
 }
 
-func ServeHTTP(w http.ResponseWriter, req *http.Request) {
+func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	dashboard, err := LoadDashboard(req.Context())
 	if err != nil {
 		log.Printf("error loading dashboard: %s", err)

@@ -38,7 +38,9 @@ import (
 	"software.sslmate.com/src/sourcespotter/sumdb"
 )
 
-func ServeGossip(address string, w http.ResponseWriter, req *http.Request) {
+func ServeGossip(w http.ResponseWriter, req *http.Request) {
+	address := req.PathValue("address")
+
 	var sth sumdb.STH
 	var rootHash []byte
 	if err := sourcespotter.DB.QueryRowContext(req.Context(), `SELECT sth.tree_size, sth.root_hash, sth.signature FROM db JOIN sth ON sth.db_id = db.db_id AND sth.tree_size = (db.verified_position->>'size')::bigint WHERE db.address = $1`, address).Scan(&sth.TreeSize, &rootHash, &sth.Signature); err != nil {
@@ -58,7 +60,9 @@ func ServeGossip(address string, w http.ResponseWriter, req *http.Request) {
 	fmt.Fprint(w, sth.Format(address))
 }
 
-func ReceiveGossip(address string, w http.ResponseWriter, req *http.Request) {
+func ReceiveGossip(w http.ResponseWriter, req *http.Request) {
+	address := req.PathValue("address")
+
 	sthBytes, err := io.ReadAll(http.MaxBytesReader(w, req.Body, 100000))
 	if err != nil {
 		http.Error(w, "Reading your request failed: "+err.Error(), 400)

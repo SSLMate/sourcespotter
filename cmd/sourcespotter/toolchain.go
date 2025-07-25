@@ -23,14 +23,29 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-package sourcespotter
+package main
 
 import (
-	"database/sql"
+	"context"
+	"log"
+	"time"
+
+	"software.sslmate.com/src/sourcespotter/internal/toolchain"
 )
 
-var (
-	DB        *sql.DB
-	DBAddress string
-	Domain    string
+const (
+	auditToolchainInterval = 5 * time.Minute
 )
+
+func auditToolchains() {
+	ticker := time.NewTicker(auditToolchainInterval)
+	defer ticker.Stop()
+	for {
+		log.Printf("auditing all toolchains...")
+		if err := toolchain.AuditAll(context.Background()); err != nil {
+			log.Fatal(err)
+		}
+		log.Printf("finished auditing all toolchains")
+		<-ticker.C
+	}
+}
