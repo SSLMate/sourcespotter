@@ -48,6 +48,10 @@ func init() {
 	os.Setenv("HOME", "/tmp")
 }
 
+func main() {
+	lambda.Start(handler)
+}
+
 func handler(ctx context.Context, event toolchainlambda.Event) error {
 	gorootBootstrap, err := downloadToolchain(ctx, event.BootstrapURL, event.BootstrapHash)
 	if err != nil {
@@ -155,8 +159,4 @@ func renameGoModFiles(root string) error {
 		}
 		return nil
 	})
-}
-
-func main() {
-	lambda.Start(handler)
 }
