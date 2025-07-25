@@ -27,63 +27,81 @@
 package main
 
 import (
+	"archive/tar"
 	"archive/zip"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
+	"go/version"
 	"io"
 	"io/fs"
 	"os"
+	"os/exec"
+	"path"
 	"path/filepath"
+	"strings"
 
 	"github.com/aws/aws-lambda-go/lambda"
 	"golang.org/x/mod/sumdb/dirhash"
 	"software.sslmate.com/src/sourcespotter/internal/httpclient"
 	toolchainlambda "software.sslmate.com/src/sourcespotter/internal/toolchain/lambda"
-	"software.sslmate.com/src/sourcespotter/toolchain"
 )
-
-func init() {
-	os.Setenv("HOME", "/tmp")
-}
 
 func main() {
 	lambda.Start(handler)
 }
 
 func handler(ctx context.Context, event toolchainlambda.Event) error {
-	gorootBootstrap, err := downloadToolchain(ctx, event.BootstrapURL, event.BootstrapHash)
-	if err != nil {
-		return fmt.Errorf("error downloading bootstrap toolchain: %w", err)
-	}
-	defer os.RemoveAll(gorootBootstrap)
-
 	workDir, err := os.MkdirTemp("", "build-*")
 	if err != nil {
 		return fmt.Errorf("failed to create temp dir: %w", err)
 	}
 	defer os.RemoveAll(workDir)
 
-	var logBuf bytes.Buffer
+	var (
+		bootstrap = filepath.Join(workDir, "bootstrap")
+		goroot    = filepath.Join(workDir, "go")
+		zipfile   = filepath.Join(goroot, "pkg", "distpack", event.Version.ZipFilename())
+	)
 
-	input := &toolchain.BuildInput{
-		WorkDir:         workDir,
-		Version:         event.Version,
-		GorootBootstrap: gorootBootstrap,
-		GetSource: func(ctx context.Context, goversion string) (io.ReadCloser, error) {
-			if goversion != event.Version.GoVersion {
-				return nil, fmt.Errorf("no source available for %q", goversion)
-			}
-			return httpclient.Download(ctx, event.SourceURL)
-		},
-		Log: &logBuf,
+	if err := downloadToolchain(ctx, bootstrap, event.BootstrapURL, event.BootstrapHash); err != nil {
+		return fmt.Errorf("error downloading bootstrap toolchain: %w", err)
+	}
+	if err := downloadSource(ctx, goroot, event.SourceURL); err != nil {
+		return fmt.Errorf("error downloading source code: %w", err)
+	}
+
+	var logBuf bytes.Buffer
+	cmdDir := filepath.Join(goroot, "src")
+	cmd := exec.CommandContext(ctx, "./make.bash", "-distpack")
+	cmd.Dir = cmdDir
+	cmd.Stdout = &logBuf
+	cmd.Stderr = &logBuf
+	cmd.Env = []string{
+		// standard environment variables
+		"HOME=/tmp",
+		"LANG=C",
+		"PATH=/usr/local/bin:/usr/bin:/bin",
+		"PWD=" + cmdDir,
+		"SHELL=/bin/sh",
+		"TMPDIR=/tmp",
+
+		// environment variables that affect the toolchain build
+		"GOTOOLCHAIN=local",
+		"GOROOT_BOOTSTRAP=" + bootstrap,
+		"GOOS=" + event.Version.GOOS,
+		"GOARCH=" + event.Version.GOARCH,
+	}
+	if event.Version.GOOS == "linux" && event.Version.GOARCH == "arm" && version.Compare(event.Version.GoVersion, "go1.21.1") >= 0 {
+		cmd.Env = append(cmd.Env, "GOARM=6")
 	}
 
 	var errs []error
-	if zipPath, err := toolchain.Build(ctx, input); err != nil {
+	if err := cmd.Run(); err != nil {
 		errs = append(errs, fmt.Errorf("build failed: %w", err))
-	} else if err := uploadFile(ctx, event.ZipUploadURL, toolchainlambda.ZipContentType, zipPath); err != nil {
+	} else if err := uploadFile(ctx, event.ZipUploadURL, toolchainlambda.ZipContentType, zipfile); err != nil {
 		errs = append(errs, fmt.Errorf("uploading zip failed: %w", err))
 	}
 
@@ -94,47 +112,89 @@ func handler(ctx context.Context, event toolchainlambda.Event) error {
 	return errors.Join(errs...)
 }
 
-func downloadToolchain(ctx context.Context, zipURL string, expectedHash string) (path string, err error) {
+func downloadSource(ctx context.Context, destdir string, tgzURL string) error {
+	reader, err := httpclient.Download(ctx, tgzURL)
+	if err != nil {
+		return err
+	}
+	defer reader.Close()
+
+	gz, err := gzip.NewReader(reader)
+	if err != nil {
+		return err
+	}
+	defer gz.Close()
+	tr := tar.NewReader(gz)
+
+	for {
+		hdr, err := tr.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		filename := path.Clean(hdr.Name)
+		filename, ok := strings.CutPrefix(filename, "go/")
+		if !ok {
+			continue
+		}
+		target := filepath.Join(destdir, filepath.FromSlash(filename))
+		switch hdr.Typeflag {
+		case tar.TypeDir:
+			if err := os.MkdirAll(target, os.FileMode(hdr.Mode)); err != nil {
+				return err
+			}
+		case tar.TypeReg:
+			if err := os.MkdirAll(filepath.Dir(target), 0777); err != nil {
+				return err
+			}
+			w, err := os.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(hdr.Mode))
+			if err != nil {
+				return err
+			}
+			if _, err := io.Copy(w, tr); err != nil {
+				w.Close()
+				return err
+			}
+			w.Close()
+		}
+	}
+	return nil
+}
+
+func downloadToolchain(ctx context.Context, destdir string, zipURL string, expectedHash string) error {
 	zipFilename, err := httpclient.DownloadToTempFile(ctx, zipURL)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer os.Remove(zipFilename)
 	if hash, err := dirhash.HashZip(zipFilename, dirhash.Hash1); err != nil {
-		return "", err
+		return err
 	} else if hash != expectedHash {
-		return "", fmt.Errorf("%q has unexpected hash %s (expected %s)", zipURL, hash, expectedHash)
+		return fmt.Errorf("%q has unexpected hash %s (expected %s)", zipURL, hash, expectedHash)
 	}
 	zipReader, err := zip.OpenReader(zipFilename)
 	if err != nil {
-		return "", err
+		return err
 	}
 	defer zipReader.Close()
 
 	gorootPaths, _ := fs.Glob(zipReader, "golang.org/toolchain@*")
 	if len(gorootPaths) != 1 {
-		return "", fmt.Errorf("%q does not appear to be a toolchain zip", zipURL)
+		return fmt.Errorf("%q does not appear to be a toolchain zip", zipURL)
 	}
 	fsys, err := fs.Sub(zipReader, gorootPaths[0])
 	if err != nil {
-		return "", fmt.Errorf("error making toolchain filesystem: %w", err)
+		return fmt.Errorf("error making toolchain filesystem: %w", err)
 	}
-	tempdir, err := os.MkdirTemp("", "toolchain-*")
-	if err != nil {
-		return "", fmt.Errorf("failed to create temp dir: %w", err)
+	if err := os.CopyFS(destdir, fsys); err != nil {
+		return fmt.Errorf("error unzipping toolchain: %w", err)
 	}
-	defer func() {
-		if err != nil {
-			os.RemoveAll(tempdir)
-		}
-	}()
-	if err := os.CopyFS(tempdir, fsys); err != nil {
-		return "", fmt.Errorf("error unzipping toolchain: %w", err)
+	if err := renameGoModFiles(destdir); err != nil {
+		return err
 	}
-	if err := renameGoModFiles(tempdir); err != nil {
-		return "", err
-	}
-	return tempdir, nil
+	return nil
 }
 
 func uploadFile(ctx context.Context, url, contentType, path string) error {
