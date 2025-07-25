@@ -37,6 +37,7 @@ import (
 	"path"
 	"path/filepath"
 	"strings"
+	goversionpkg "go/version"
 )
 
 type BuildInput struct {
@@ -76,7 +77,7 @@ func (b *BuildInput) build(ctx context.Context) (string, error) {
 		"GOOS=" + b.Version.GOOS,
 		"GOARCH=" + b.Version.GOARCH,
 	}
-	if b.Version.GOOS == "linux" && b.Version.GOARCH == "arm" && b.Version.GoVersion != "go1.21.0" {
+	if b.Version.GOOS == "linux" && b.Version.GOARCH == "arm" && goversionpkg.Compare(b.Version.GoVersion, "go1.21.1") >= 0 {
 		env = append(env, "GOARM=6")
 	}
 	if err := b.buildSource(ctx, goroot, []string{"-distpack"}, env); err != nil {
