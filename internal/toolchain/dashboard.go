@@ -85,15 +85,15 @@ func (s *sourceRow) DownloadedAtString() string {
 	return s.DownloadedAt.UTC().Format("2006-01-02 15:04:05")
 }
 
-type Dashboard struct {
+type dashboard struct {
 	Verified  []string
 	Failures  []failureRow
 	Sources   []sourceRow
 	BuildInfo *debug.BuildInfo
 }
 
-func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
-	dash := new(Dashboard)
+func loadDashboard(ctx context.Context, db *sql.DB) (*dashboard, error) {
+	dash := new(dashboard)
 	if err := dbutil.QueryAll(ctx, db, &dash.Verified, `SELECT version FROM toolchain_build WHERE status='equal'`); err != nil {
 		return nil, err
 	}
@@ -133,11 +133,11 @@ func LoadDashboard(ctx context.Context, db *sql.DB) (*Dashboard, error) {
 	return dash, nil
 }
 
-func ServeHTTP(w http.ResponseWriter, req *http.Request, db *sql.DB, template *template.Template) {
+func ServeDashboard(w http.ResponseWriter, req *http.Request, db *sql.DB, template *template.Template) {
 	if template == nil {
 		template = defaultDashboardTemplate
 	}
-	dash, err := LoadDashboard(req.Context(), db)
+	dash, err := loadDashboard(req.Context(), db)
 	if err != nil {
 		log.Printf("error loading toolchain dashboard: %s", err)
 		http.Error(w, "Internal Database Error", 500)
