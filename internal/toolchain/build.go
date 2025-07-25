@@ -58,7 +58,7 @@ var (
 	Go120Hash   string
 )
 
-// AuditAll tries building all toolchains in the sumdb that haven't already been built
+// AuditAll tries auditing all toolchains in the sumdb that haven't already been built
 func AuditAll(ctx context.Context, db *sql.DB) error {
 	g, ctx := errgroup.WithContext(ctx)
 	g.SetLimit(10)
@@ -93,7 +93,7 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 				})
 			}
 			g.Go(func() error {
-				if err := process(ctx, db, version, formatHash1(sha256)); err != nil {
+				if err := audit(ctx, db, version, formatHash1(sha256)); err != nil {
 					return fmt.Errorf("error building %s: %w", version, err)
 				}
 				return nil
@@ -104,21 +104,22 @@ func AuditAll(ctx context.Context, db *sql.DB) error {
 	return g.Wait()
 }
 
+// Audit checks that the building the given toolchain results in the checksum published in the sumdb
 func Audit(ctx context.Context, db *sql.DB, modversion string) error {
 	var sha256 []byte
 	if err := db.QueryRowContext(ctx, `SELECT source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND version = $1`, modversion).Scan(&sha256); err != nil {
 		return err
 	}
-	return process(ctx, db, modversion, formatHash1(sha256))
+	return audit(ctx, db, modversion, formatHash1(sha256))
 }
 
-// process checks that the building the given toolchain results in the given checksum
-func process(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
+// audit checks that the building the given toolchain results in the given checksum
+func audit(ctx context.Context, db *sql.DB, modversion string, expectedHash string) error {
 	if strings.HasPrefix(modversion, "v0.0.1-go1.9.2rc2.") {
 		// go1.9.2rc2 is not a valid Go version, so ParseModVersion fails
 		// This version was released by mistake; see https://github.com/golang/go/issues/68634#issuecomment-2867535846
 		// But go1.9.x isn't expected to be reproducible anyways so just skip it
-		return process0(ctx, db, modversion)
+		return skip(ctx, db, modversion)
 	}
 
 	version, ok := toolchain.ParseModVersion(modversion)
@@ -140,24 +141,24 @@ func process(ctx context.Context, db *sql.DB, modversion string, expectedHash st
 		expectedHash = fixedHash
 	}
 	if goversionpkg.Compare(version.GoVersion, "go1.21") < 0 {
-		return process0(ctx, db, modversion)
+		return skip(ctx, db, modversion)
 	} else if goversionpkg.Compare(version.GoVersion, "go1.24") < 0 {
-		return process1(ctx, db, version, expectedHash, hashFixer)
+		return auditLegacy(ctx, db, version, expectedHash, hashFixer)
 	} else {
-		return process2(ctx, db, version, expectedHash, hashFixer)
+		return auditModern(ctx, db, version, expectedHash, hashFixer)
 	}
 }
 
-// process a non-reproducible toolchain (prior to Go 1.21)
-func process0(ctx context.Context, db *sql.DB, modversion string) error {
+// skip a non-reproducible toolchain (prior to Go 1.21)
+func skip(ctx context.Context, db *sql.DB, modversion string) error {
 	return storeBuildResult(ctx, db, modversion, &buildResult{
 		Status:  buildSkipped,
 		Message: sqlValid("this version of Go does not support reproducible builds"),
 	})
 }
 
-// process a toolchain (Go 1.21 - 1.23) that can be reproduced with a non-reproducible Go 1.20 bootstrap toolchain
-func process1(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
+// audit a toolchain (Go 1.21 - 1.23) that can be reproduced with a non-reproducible Go 1.20 bootstrap toolchain
+func auditLegacy(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	if Go120Object == "" || Go120Hash == "" {
 		return storeBuildResult(ctx, db, version.ModVersion(), &buildResult{
 			Status:  buildSkipped,
@@ -221,8 +222,8 @@ func pickModernBootstrapToolchain(ctx context.Context, db *sql.DB, lang string, 
 	return highestVersion, formatHash1(highestVersionSHA256), highestVersionStatus, nil
 }
 
-// process a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
-func process2(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
+// audit a toolchain (Go 1.24 or higher) that can be reproduced with a reproducible bootstrap toolchain
+func auditModern(ctx context.Context, db *sql.DB, version toolchain.Version, expectedHash string, hashFixer toolchain.HashFixer) error {
 	var (
 		bootstrapOS   = "linux"
 		bootstrapArch = LambdaArch
