@@ -46,7 +46,7 @@ type BuildInput struct {
 	// Version is the version of the toolchain to build
 	Version Version
 
-	// GorootBootstrap is the path to a GOROOT to use for bootstrapping; if empty, then bootstrap toolchains will be downloaded with GetSource and built using the host's C compiler
+	// GorootBootstrap is the path to a GOROOT to use for bootstrapping
 	GorootBootstrap string
 
 	// GetSource returns the source tar.gz file for the given Go version, e.g. "go1.24.4"
@@ -63,13 +63,6 @@ func Build(ctx context.Context, input *BuildInput) (string, error) {
 
 func (b *BuildInput) build(ctx context.Context) (string, error) {
 	gorootBootstrap := b.GorootBootstrap
-	if gorootBootstrap == "" {
-		var err error
-		gorootBootstrap, err = b.buildBootstrap(ctx, b.Version.GoVersion)
-		if err != nil {
-			return "", err
-		}
-	}
 
 	b.logf("Getting source for %s...", b.Version.GoVersion)
 	goroot := filepath.Join(b.WorkDir, "goroot")
@@ -91,40 +84,6 @@ func (b *BuildInput) build(ctx context.Context) (string, error) {
 	}
 	zippath := filepath.Join(goroot, "pkg", "distpack", b.Version.ZipFilename())
 	return zippath, nil
-}
-
-func (b *BuildInput) buildBootstrap(ctx context.Context, goversion string) (string, error) {
-	bootstrapVersion := BootstrapToolchain(goversion)
-	if bootstrapVersion == "" {
-		// only need C compiler
-		return "", nil
-	}
-
-	gorootBootstrap2, err := b.buildBootstrap(ctx, bootstrapVersion)
-	if err != nil {
-		return "", err
-	}
-
-	b.logf("Building %s using %q...", bootstrapVersion, gorootBootstrap2)
-	gorootBootstrap := filepath.Join(b.WorkDir, bootstrapVersion)
-	if err := b.getSource(ctx, bootstrapVersion, gorootBootstrap); err != nil {
-		return "", fmt.Errorf("error getting source for %s: %w", bootstrapVersion, err)
-	}
-	var env []string
-	if gorootBootstrap2 == "" {
-		// bootstrapping using C compiler
-		// these settings are needed to build the toolchain successfully on modern systems
-		env = append(env,
-			"CC=gcc -no-pie",
-			"CGO_ENABLED=0",
-		)
-	} else {
-		env = append(env, "GOROOT_BOOTSTRAP="+gorootBootstrap2)
-	}
-	if err := b.buildSource(ctx, gorootBootstrap, nil, env); err != nil {
-		return "", fmt.Errorf("error building source for %s (using %q for bootstrap): %w", bootstrapVersion, gorootBootstrap2, err)
-	}
-	return gorootBootstrap, nil
 }
 
 func (b *BuildInput) getSource(ctx context.Context, goVersion string, destDir string) error {

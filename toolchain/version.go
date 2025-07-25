@@ -31,32 +31,6 @@ import (
 	"strings"
 )
 
-// FirstReproducibleVersion is the first version of Go that was reproducible
-const FirstReproducibleVersion = "go1.21.0"
-
-// IsReproducible reports if goversion is supposed to be reproducible
-func IsReproducible(goversion string) bool {
-	return version.Compare(goversion, FirstReproducibleVersion) >= 0
-}
-
-// BootstrapToolchain returns the version of Go needed to bootstrap goversion, or the empty string if a C compiler is needed
-func BootstrapToolchain(goversion string) string {
-	// see https://go.dev/doc/install/source#go14
-	if version.Compare(goversion, "go1.26.0") >= 0 {
-		return "go1.24.0"
-	} else if version.Compare(goversion, "go1.24.0") >= 0 {
-		return "go1.22.12"
-	} else if version.Compare(goversion, "go1.22.0") >= 0 {
-		return "go1.20.14"
-	} else if version.Compare(goversion, "go1.20") >= 0 {
-		return "go1.17.13"
-	} else if version.Compare(goversion, "go1.5") >= 0 {
-		return "go1.4.3"
-	} else {
-		return ""
-	}
-}
-
 // Version uniquely identifies a built toolchain
 type Version struct {
 	GoVersion string // e.g. "go1.21.0"
