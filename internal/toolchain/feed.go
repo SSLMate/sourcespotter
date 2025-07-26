@@ -26,17 +26,19 @@
 package toolchain
 
 import (
+	"database/sql"
 	"encoding/csv"
 	"encoding/hex"
 	"encoding/xml"
 	"fmt"
+	"go/version"
 	"io"
 	"log"
 	"net/http"
 	"slices"
 	"time"
 
-	"go/version"
+	"golang.org/x/mod/semver"
 	"software.sslmate.com/src/sourcespotter"
 	"src.agwa.name/go-dbutil"
 )
@@ -187,6 +189,46 @@ func ServeSourcesCSV(w http.ResponseWriter, req *http.Request) {
 			row.URL,
 			hex.EncodeToString(row.SHA256),
 			row.DownloadedAt.UTC().Format(time.RFC3339),
+		})
+	}
+	cw.Flush()
+}
+
+func ServeToolchainsCSV(w http.ResponseWriter, req *http.Request) {
+	type row struct {
+		Version    string              `sql:"version"`
+		Status     sql.Null[string]    `sql:"status"`
+		Message    sql.Null[string]    `sql:"message"`
+		InsertedAt sql.Null[time.Time] `sql:"inserted_at"`
+	}
+	ctx := req.Context()
+	var rows []*row
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &rows, `SELECT record.version,toolchain_build.status,toolchain_build.message,toolchain_build.inserted_at FROM record LEFT JOIN toolchain_build USING (version) WHERE module='golang.org/toolchain'`); err != nil {
+		log.Printf("error querying toolchains: %s", err)
+		http.Error(w, "Internal Database Error", 500)
+		return
+	}
+	slices.SortFunc(rows, func(a, b *row) int {
+		return semver.Compare(a.Version, b.Version)
+	})
+	w.Header().Set("Content-Type", "text/csv; charset=UTF-8; header=present")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Cache-Control", "public, max-age=300, must-revalidate")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	w.WriteHeader(http.StatusOK)
+	cw := csv.NewWriter(w)
+	cw.UseCRLF = true
+	cw.Write([]string{"Version", "Status", "Message", "Build Time"})
+	for _, row := range rows {
+		var t string
+		if row.InsertedAt.Valid {
+			t = row.InsertedAt.V.UTC().Format(time.RFC3339)
+		}
+		cw.Write([]string{
+			row.Version,
+			row.Status.V,
+			row.Message.V,
+			t,
 		})
 	}
 	cw.Flush()
