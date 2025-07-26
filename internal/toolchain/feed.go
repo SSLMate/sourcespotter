@@ -46,8 +46,11 @@ import (
 type atomFeed struct {
 	XMLName xml.Name   `xml:"feed"`
 	Xmlns   string     `xml:"xmlns,attr"`
+	ID      string     `xml:"id"`
 	Title   string     `xml:"title"`
 	Updated string     `xml:"updated"`
+	Author  atomPerson `xml:"author"`
+	Link    atomLink   `xml:"link"`
 	Entries []atomItem `xml:"entry"`
 }
 
@@ -61,6 +64,15 @@ type atomItem struct {
 type atomContent struct {
 	Type string `xml:"type,attr"`
 	Body string `xml:",chardata"`
+}
+
+type atomPerson struct {
+	Name string `xml:"name"`
+}
+
+type atomLink struct {
+	Rel  string `xml:"rel,attr,omitempty"`
+	Href string `xml:"href,attr"`
 }
 
 func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
@@ -78,7 +90,14 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	feed := atomFeed{Xmlns: "http://www.w3.org/2005/Atom", Title: "Toolchain Build Failures"}
+	feedURL := "https://" + sourcespotter.Domain + "/toolchain/failures.atom"
+	feed := atomFeed{
+		Xmlns:  "http://www.w3.org/2005/Atom",
+		ID:     feedURL,
+		Title:  "Toolchain Build Failures",
+		Author: atomPerson{Name: "Source Spotter on " + sourcespotter.Domain},
+		Link:   atomLink{Rel: "self", Href: feedURL},
+	}
 	if len(rows) > 0 {
 		feed.Updated = rows[0].InsertedAt.UTC().Format(time.RFC3339)
 	} else {
@@ -88,7 +107,7 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 	for _, row := range rows {
 		entry := atomItem{
 			Title:   fmt.Sprintf("%s %s", row.Version, row.Status),
-			ID:      fmt.Sprintf("%s/toolchain/%s/%d", sourcespotter.Domain, row.Version, row.InsertedAt.UnixNano()),
+			ID:      fmt.Sprintf("%s#%d-%s", feedURL, row.InsertedAt.UnixNano(), row.Version),
 			Updated: row.InsertedAt.UTC().Format(time.RFC3339),
 		}
 		body := row.Message
