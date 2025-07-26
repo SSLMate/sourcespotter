@@ -30,23 +30,22 @@ import (
 	"embed"
 	"encoding/hex"
 	"fmt"
-	"html/template"
 	"log"
 	"net/http"
-	"runtime/debug"
 	"slices"
 	"time"
 
 	"go/version"
 	"golang.org/x/mod/semver"
 	"software.sslmate.com/src/sourcespotter"
+	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"src.agwa.name/go-dbutil"
 )
 
 //go:embed templates/*
-var content embed.FS
+var templates embed.FS
 
-var defaultDashboardTemplate = template.Must(template.ParseFS(content, "templates/dashboard.html"))
+var dashboardTemplate = basedashboard.ParseTemplate(templates, "templates/dashboard.html")
 
 type failureRow struct {
 	Version    string    `sql:"version"`
@@ -89,7 +88,6 @@ type dashboard struct {
 	Verified  []string
 	Failures  []failureRow
 	Sources   []sourceRow
-	BuildInfo *debug.BuildInfo
 }
 
 func loadDashboard(ctx context.Context) (*dashboard, error) {
@@ -129,7 +127,6 @@ func loadDashboard(ctx context.Context) (*dashboard, error) {
 		return version.Compare(a.Version, b.Version)
 	})
 
-	dash.BuildInfo, _ = debug.ReadBuildInfo()
 	return dash, nil
 }
 
@@ -140,9 +137,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Internal Database Error", 500)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Xss-Protection", "0")
-	w.WriteHeader(http.StatusOK)
-	defaultDashboardTemplate.Execute(w, dash)
+	basedashboard.ServePage(w, req, "Go Toolchain Builds - Source Spotter", dashboardTemplate, dash)
 }

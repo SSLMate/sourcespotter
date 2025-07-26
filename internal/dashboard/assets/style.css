@@ -1,0 +1,136 @@
+body {
+	margin: 0;
+	font-family: sans-serif;
+	background: white;
+	color: black;
+}
+main {
+	margin: 1rem;
+}
+a {
+	color: black;
+	text-decoration: underline;
+}
+.header {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	background-color: steelblue;
+	padding: 0 1rem;
+	color: white;
+	height: 3.5rem;
+	position: relative;
+}
+.header-left {
+	font-weight: bold;
+	display: flex;
+	align-items: center;
+	height: 100%;
+	font-size: 150%;
+}
+.header-right {
+	display: flex;
+	gap: 1.5rem;
+	align-items: flex-end;
+	height: 100%;
+}
+.header-link {
+	border-radius: 4px 4px 0 0;
+	text-decoration: none;
+	color: white;
+	display: flex;
+	align-items: center;
+	padding: 0;
+	height: 2.4rem;
+}
+.header-link:hover {
+	text-decoration: underline;
+}
+@media (min-width: 601px) {
+	.header-link.header-selected {
+		background-color: white;
+		color: steelblue;
+		padding: 0 0.75rem;
+		text-decoration: none;
+	}
+	.header-menu {
+		display: none;
+	}
+}
+@media (max-width: 600px) {
+	.header-right {
+		display: none;
+		position: absolute;
+		top: 3.5rem;
+		right: 0;
+		background-color: steelblue;
+		flex-direction: column;
+		width: 100%;
+		padding: 1rem;
+		z-index: 1000;
+	}
+	.header-right.header-right-show {
+		display: flex !important;
+		flex-direction: column;
+		height: auto;
+	}
+	.header-link {
+		height: 1.4rem;
+	}
+	.header-menu {
+		display: flex;
+		flex-direction: column;
+		text-decoration: none;
+		color: white;
+	}
+	.header-menu:hover {
+		text-decoration: underline;
+	}
+}
+table {
+	border: solid black 1px;
+	border-collapse: collapse;
+}
+td, th {
+	border: solid black 1px;
+	padding: 0.3rem 0.4rem;
+	text-align: left;
+}
+code {
+	background: #f3f3f3;
+	border: solid #e3e3e3 1px;
+	border-radius: 2px;
+	padding: 1px 3px;
+	white-space: nowrap;
+}
+section {
+	margin: 1.5rem 0;
+}
+.versionlist {
+	column-width: 20rem;
+	column-gap: 1rem;
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	line-height: 1.6rem;
+}
+h2, summary.h2 {
+	font-size: 140%;
+	font-weight: bold;
+	margin: 0 0 0.75em 0;
+}
+summary {
+	cursor: pointer;
+}
+footer {
+	margin: 4rem 1rem 0.5rem 1rem;
+	text-align: right;
+	font-size: 80%;
+	color: #444;
+}
+footer:hover {
+	color: black;
+}
+footer a {
+	color: inherit;
+}

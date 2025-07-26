@@ -1,72 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<!--
-	Copyright (C) 2025 Opsmate, Inc.
-
-	Permission is hereby granted, free of charge, to any person obtaining a
-	copy of this software and associated documentation files (the "Software"),
-	to deal in the Software without restriction, including without limitation
-	the rights to use, copy, modify, merge, publish, distribute, sublicense,
-	and/or sell copies of the Software, and to permit persons to whom the
-	Software is furnished to do so, subject to the following conditions:
-
-	The above copyright notice and this permission notice shall be included
-	in all copies or substantial portions of the Software.
-
-	THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-	IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-	FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
-	THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-	OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-	ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-	OTHER DEALINGS IN THE SOFTWARE.
-
-	Except as contained in this notice, the name(s) of the above copyright
-	holders shall not be used in advertising or otherwise to promote the
-	sale, use or other dealings in this Software without prior written
-	authorization.
--->
-<head>
-	<meta charset="UTF-8"/>
-	<title>Source Spotter - Go Checksum Database Auditor</title>
-	<style>
-		html, body { background: white; color: black; }
-		html { margin: 0; padding: 0; }
-		body { margin: 0; padding: 2rem; }
-		h1 { margin-top: 0; }
-		a { color: black; text-decoration: underline; }
-		table {
-			border: solid black 1px;
-			border-collapse: collapse;
-		}
-		td, th {
-			border: solid black 1px;
-			padding: 0.3rem 0.4rem;
-			text-align: left;
-		}
-		.failed {
-			background: #fde;
-		}
-		code {
-			background: #f3f3f3;
-			border: solid #e3e3e3 1px;
-			border-radius: 2px;
-			padding: 1px 3px;
-		}
-		section {
-			margin: 2rem 0;
-		}
-		li {
-			margin-top: 0.5em;
-			margin-bottom: 0.5em;
-		}
-		.version {
-			font-style: italic;
-		}
-	</style>
-</head>
-<body>
-	<h1>Source Spotter Dashboard</h1>
+{{ define "content" }}
+<main>
+	<h1>Checksum Database Auditor</h1>
 
 	<section>
 		<h2>Monitored Databases</h2>
@@ -81,7 +15,7 @@
 						<td>{{ .Address }}</td>
 						<td>{{ .LargestSTHTime.Format "2006-01-02 15:04:05 UTC" }}</td>
 						<td>{{ .LargestSTHSize }}</td>
-						<td>{{ .VerifiedSize }} (<a href="{{ .Address }}">Download</a>)</td>
+						<td>{{ .VerifiedSize }} (<a href="https://gossip.api.{{ $.Domain }}/{{ .Address }}">Download</a>)</td>
 						<td>{{ .VerifyBacklog }}</td>
 						<td>{{ .DownloadBacklog }}</td>
 					</tr>
@@ -133,16 +67,5 @@
 			</tbody>
 		</table>
 	</section>
-	<section>
-		<h2>Credits</h2>
-		<p>
-			Source Spotter is developed by <a href="https://sslmate.com/">SSLMate</a>,
-			the creator of the <a href="https://sslmate.com/certspotter/">Cert Spotter Certificate Transparency Monitor</a>.
-		</p>
-
-		{{ if .BuildInfo }}
-			<p class="version">{{ .BuildInfo.Main.Path }}@{{ .BuildInfo.Main.Version }} ({{ .BuildInfo.Main.Sum }})</p>
-		{{ end }}
-	</section>
-</body>
-</html>
+</main>
+{{ end }}

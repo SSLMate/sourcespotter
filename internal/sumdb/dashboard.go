@@ -32,19 +32,19 @@ import (
 	"html/template"
 	"log"
 	"net/http"
-	"runtime/debug"
 	"time"
 
 	"software.sslmate.com/src/certspotter/merkletree"
 	"software.sslmate.com/src/sourcespotter"
+	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 	"src.agwa.name/go-dbutil"
 )
 
 //go:embed templates/*
-var content embed.FS
+var templates embed.FS
 
-var defaultDashboardTemplate = template.Must(template.ParseFS(content, "templates/dashboard.html"))
+var dashboardTemplate = basedashboard.ParseTemplate(templates, "templates/dashboard.html")
 
 type SumDB struct {
 	Address        string
@@ -100,14 +100,14 @@ type DuplicateRecord struct {
 }
 
 type Dashboard struct {
+	Domain           string
 	SumDBs           []SumDB
 	InconsistentSTHs []InconsistentSTH
 	DuplicateRecords []DuplicateRecord
-	BuildInfo        *debug.BuildInfo
 }
 
 func LoadDashboard(ctx context.Context) (*Dashboard, error) {
-	dashboard := new(Dashboard)
+	dashboard := &Dashboard{Domain: sourcespotter.Domain}
 
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.SumDBs, `
 		SELECT
@@ -157,8 +157,6 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 		return nil, err
 	}
 
-	dashboard.BuildInfo, _ = debug.ReadBuildInfo()
-
 	return dashboard, nil
 }
 
@@ -169,9 +167,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Internal Database Error", 500)
 		return
 	}
-	w.Header().Set("Content-Type", "text/html")
-	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("X-Xss-Protection", "0")
-	w.WriteHeader(http.StatusOK)
-	defaultDashboardTemplate.Execute(w, dashboard)
+	basedashboard.ServePage(w, req, "Go Checksum Database Auditor - Source Spotter", dashboardTemplate, dashboard)
 }

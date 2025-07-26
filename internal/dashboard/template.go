@@ -23,40 +23,51 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-package main
+package dashboard
 
 import (
-	"log"
+	"embed"
+	"html/template"
+	"io/fs"
 	"net/http"
-	"time"
+	"runtime/debug"
 
 	"software.sslmate.com/src/sourcespotter"
-	"software.sslmate.com/src/sourcespotter/internal/dashboard"
-	"software.sslmate.com/src/sourcespotter/internal/sths"
-	"software.sslmate.com/src/sourcespotter/internal/sumdb"
-	"software.sslmate.com/src/sourcespotter/internal/toolchain"
-	"src.agwa.name/go-util/logfilter"
 )
 
-func newHTTPServer() *http.Server {
-	domain := sourcespotter.Domain
+//go:embed assets/*
+var Assets embed.FS
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("GET "+domain+"/{$}", dashboard.ServeHome)
-	mux.Handle("GET "+domain+"/assets/", http.FileServerFS(dashboard.Assets))
-	mux.HandleFunc("GET "+domain+"/sumdb/{$}", sumdb.ServeDashboard)
-	mux.HandleFunc("GET "+domain+"/toolchain/{$}", toolchain.ServeDashboard)
-	mux.HandleFunc("GET "+domain+"/toolchain/failures.atom", toolchain.ServeFailuresAtom)
-	mux.HandleFunc("GET "+domain+"/toolchain/sources.csv", toolchain.ServeSourcesCSV)
-	mux.HandleFunc("GET "+domain+"/toolchain/toolchains.csv", toolchain.ServeToolchainsCSV)
-	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
-	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
+//go:embed templates/*
+var templates embed.FS
 
-	return &http.Server{
-		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 15 * time.Second,
-		IdleTimeout:  3 * time.Second,
-		Handler:      mux,
-		ErrorLog:     logfilter.New(log.Default(), logfilter.HTTPServerErrors),
+var templateFuncs = template.FuncMap{}
+
+var baseTemplate = template.Must(template.New("base.html").Funcs(templateFuncs).ParseFS(templates, "templates/base.html"))
+
+func ParseTemplate(fs fs.FS, patterns ...string) *template.Template {
+	return template.Must(template.Must(baseTemplate.Clone()).ParseFS(fs, patterns...))
+}
+
+type templateData struct {
+	Domain    string
+	BuildInfo *debug.BuildInfo
+	Request   *http.Request
+	Title     string
+	Body      any
+}
+
+func ServePage(w http.ResponseWriter, req *http.Request, title string, tmpl *template.Template, body any) {
+	data := &templateData{
+		Domain:  sourcespotter.Domain,
+		Request: req,
+		Title:   title,
+		Body:    body,
 	}
+	data.BuildInfo, _ = debug.ReadBuildInfo()
+	w.Header().Set("Content-Type", "text/html; charset=UTF-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("X-Xss-Protection", "0")
+	w.WriteHeader(http.StatusOK)
+	tmpl.Execute(w, data)
 }
