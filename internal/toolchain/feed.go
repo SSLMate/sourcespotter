@@ -101,16 +101,16 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 		Link:   atomLink{Rel: "self", Href: feedURL},
 	}
 	if len(rows) > 0 {
-		feed.Updated = rows[0].InsertedAt.UTC().Format(time.RFC3339)
+		feed.Updated = rows[0].InsertedAt.UTC().Format(time.RFC3339Nano)
 	} else {
-		feed.Updated = time.Now().UTC().Format(time.RFC3339)
+		feed.Updated = time.Now().UTC().Format(time.RFC3339Nano)
 	}
 
 	for _, row := range rows {
 		entry := atomItem{
 			Title:   fmt.Sprintf("%s %s", row.Version, row.Status),
 			ID:      fmt.Sprintf("%s#%d-%s", feedURL, row.InsertedAt.UnixNano(), row.Version),
-			Updated: row.InsertedAt.UTC().Format(time.RFC3339),
+			Updated: row.InsertedAt.UTC().Format(time.RFC3339Nano),
 		}
 		body := row.Message
 		if len(row.BuildID) > 0 {
@@ -188,7 +188,7 @@ func ServeSourcesCSV(w http.ResponseWriter, req *http.Request) {
 			row.Version,
 			row.URL,
 			hex.EncodeToString(row.SHA256),
-			row.DownloadedAt.UTC().Format(time.RFC3339),
+			row.DownloadedAt.UTC().Format(time.RFC3339Nano),
 		})
 	}
 	cw.Flush()
@@ -222,7 +222,7 @@ func ServeToolchainsCSV(w http.ResponseWriter, req *http.Request) {
 	for _, row := range rows {
 		var t string
 		if row.InsertedAt.Valid {
-			t = row.InsertedAt.V.UTC().Format(time.RFC3339)
+			t = row.InsertedAt.V.UTC().Format(time.RFC3339Nano)
 		}
 		cw.Write([]string{
 			row.Version,
