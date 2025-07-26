@@ -23,47 +23,39 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-package main
+package toolchain
 
 import (
-	"context"
-	"log"
-	"time"
-
-	"golang.org/x/sync/errgroup"
-	"software.sslmate.com/src/sourcespotter/internal/toolchain"
+	"fmt"
+	"testing"
 )
 
-func auditToolchains() {
-	const (
-		auditInterval = 5 * time.Minute
-		gcInterval    = 24 * time.Hour
-	)
-
-	g, ctx := errgroup.WithContext(context.Background())
-	g.Go(func() error {
-		ticker := time.NewTicker(auditInterval)
-		defer ticker.Stop()
-		for {
-			log.Printf("auditing all toolchains...")
-			if err := toolchain.AuditAll(ctx); err != nil {
-				return err
-			}
-			log.Printf("finished auditing all toolchains")
-			<-ticker.C
+func TestParseArtifactKey(t *testing.T) {
+	tests := []struct {
+		key     string
+		version string
+		build   string
+		ok      bool
+	}{
+		{"out/v0.0.1-go1.26.linux-amd64.1234abcd.log", "v0.0.1-go1.26.linux-amd64", "1234abcd", true},
+		{"out/v0.0.1-go1.26.linux-amd64.1234abcd.zip", "v0.0.1-go1.26.linux-amd64", "1234abcd", true},
+		{"out/invalid", "", "", false},
+		{"out/version.nothex.log", "", "", false},
+	}
+	for _, tt := range tests {
+		gotV, gotB, ok := parseArtifactKey(tt.key)
+		if ok != tt.ok {
+			t.Errorf("parseArtifactKey(%q) ok=%v want %v", tt.key, ok, tt.ok)
+			continue
 		}
-	})
-	g.Go(func() error {
-		ticker := time.NewTicker(gcInterval)
-		defer ticker.Stop()
-		for {
-			log.Printf("garbage collecting toolchain artifacts...")
-			if err := toolchain.GarbageCollectArtifacts(ctx, false); err != nil {
-				return err
-			}
-			log.Printf("finished garbage collecting toolchain artifacts")
-			<-ticker.C
+		if !ok {
+			continue
 		}
-	})
-	log.Fatal(g.Wait())
+		if gotV != tt.version {
+			t.Errorf("parseArtifactKey(%q) version=%q want %q", tt.key, gotV, tt.version)
+		}
+		if fmt.Sprintf("%x", gotB) != tt.build {
+			t.Errorf("parseArtifactKey(%q) build=%x want %s", tt.key, gotB, tt.build)
+		}
+	}
 }
