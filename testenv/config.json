@@ -1,4 +1,5 @@
 {
+  "Listen": ["tls:/etc/sourcespotter-cert.pem:tcp:8443"],
   "Domain": "sourcespotter.localhost",
   "Database": "postgres://sourcespotter:sourcespotter@localhost/sourcespotter?sslmode=disable",
   "Toolchain": {
