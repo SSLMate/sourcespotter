@@ -5,7 +5,7 @@ REPO_ROOT=$(dirname "$0")/..
 cd "$REPO_ROOT"
 
 # Install dependencies
-apt-get update
+apt-get update || true
 DEBIAN_FRONTEND=noninteractive apt-get install -y postgresql mkcert >/dev/null
 
 # Start PostgreSQL
@@ -42,3 +42,4 @@ mkcert -cert-file testenv/cert.pem -key-file testenv/key.pem \
 
 # Combine cert and key because go-listener expects them in one file
 cat testenv/key.pem testenv/cert.pem > testenv/server.pem
+chmod 644 testenv/server.pem
