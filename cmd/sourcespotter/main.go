@@ -33,6 +33,7 @@ import (
 	"flag"
 	"log"
 	"os"
+	"slices"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -69,6 +70,7 @@ func main() {
 	var cfg struct {
 		Domain    string
 		Database  string
+		Listen    []string
 		Toolchain struct {
 			Bucket             string
 			BootstrapToolchain string
@@ -101,8 +103,8 @@ func main() {
 	toolchain.LambdaArch = cfg.Toolchain.LambdaArch
 	toolchain.LambdaFunc = cfg.Toolchain.LambdaFunc
 
-	if len(flags.listen) > 0 {
-		listeners, err := listener.OpenAll(flags.listen)
+	if listen := slices.Concat(cfg.Listen, flags.listen); len(listen) > 0 {
+		listeners, err := listener.OpenAll(listen)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -110,7 +112,7 @@ func main() {
 		server := newHTTPServer()
 		for i, listener := range listeners {
 			go func() {
-				log.Printf("serving HTTP on %s...", flags.listen[i])
+				log.Printf("serving HTTP on %s...", listen[i])
 				log.Fatal(server.Serve(listener))
 			}()
 		}
