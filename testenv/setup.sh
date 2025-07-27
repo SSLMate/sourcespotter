@@ -15,6 +15,7 @@ service postgresql start
 sudo -u postgres psql <<'PSQL'
 CREATE ROLE sourcespotter LOGIN PASSWORD 'sourcespotter';
 CREATE DATABASE sourcespotter OWNER sourcespotter;
+\c sourcespotter
 SET ROLE sourcespotter;
 \i schema/20-tables.sql
 \i schema/30-triggers.sql
