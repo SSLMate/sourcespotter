@@ -1,0 +1,11 @@
+{
+  "Domain": "sourcespotter.localhost",
+  "Database": "postgres://sourcespotter:sourcespotter@localhost/sourcespotter?sslmode=disable",
+  "Toolchain": {
+    "Bucket": "",
+    "BootstrapToolchain": "",
+    "BootstrapHash": "",
+    "LambdaArch": "",
+    "LambdaFunc": ""
+  }
+}

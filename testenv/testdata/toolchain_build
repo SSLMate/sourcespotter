@@ -1,0 +1,26 @@
+v0.0.1-go1.15.9.darwin-amd64	2025-07-24 15:15:33.786155+00	skipped	this version of Go does not support reproducible builds	\N	\N
+v0.0.1-go1.15.10.darwin-amd64	2025-07-24 15:15:40.40476+00	skipped	this version of Go does not support reproducible builds	\N	\N
+v0.0.1-go1.16.1.freebsd-386	2025-07-24 15:15:40.460837+00	skipped	this version of Go does not support reproducible builds	\N	\N
+v0.0.1-go1.21.12.freebsd-riscv64	2025-07-24 23:30:09.042249+00	equal	\N	\N
+v0.0.1-go1.21.12.linux-386	2025-07-24 23:30:52.627056+00	equal	\N	\N
+v0.0.1-go1.21.12.illumos-amd64	2025-07-24 23:30:54.507805+00	equal	\N	\N
+v0.0.1-go1.21.12.linux-amd64	2025-07-24 23:31:03.714017+00	equal	\N	\N
+v0.0.1-go1.21.12.linux-arm64	2025-07-24 23:31:06.812431+00	equal	\N	\N
+v0.0.1-go1.21.12.linux-loong64	2025-07-24 23:32:17.218376+00	equal	\N	\N
+v0.0.1-go1.21.12.linux-mips	2025-07-24 23:32:33.360191+00	equal	\N	\N
+v0.0.1-go1.21.12.linux-mips64	2025-07-24 23:33:17.556931+00	equal	\N	\N
+v0.0.1-go1.9.2rc2.darwin-amd64	2025-07-25 16:08:22.484439+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.windows-386	2025-07-25 16:08:22.521531+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.windows-amd64	2025-07-25 16:08:22.560848+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.linux-ppc64le	2025-07-25 16:08:22.600684+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.linux-arm64	2025-07-25 16:08:22.602431+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.linux-386	2025-07-25 16:08:22.613257+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.freebsd-386	2025-07-25 16:08:22.61386+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.linux-amd64	2025-07-25 16:08:22.620297+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.linux-s390x	2025-07-25 16:08:22.620527+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.9.2rc2.linux-arm	2025-07-25 16:08:22.630342+00	failed	unable to parse module version	\N	\N
+v0.0.1-go1.21.12.linux-mips64le	2025-07-24 23:33:51.556474+00	unequal	\N	\N
+v0.0.1-go1.21.12.linux-mipsle	2025-07-24 23:34:29.911415+00	unequal	\N	\N
+v0.0.1-go1.21.12.linux-ppc64le	2025-07-24 23:34:32.140586+00	unequal	\N	\N
+v0.0.1-go1.21.12.linux-ppc64	2025-07-24 23:34:40.240953+00	unequal	\N	\N
+v0.0.1-go1.21.12.linux-riscv64	2025-07-24 23:34:48.9015+00	unequal	\N	\N
