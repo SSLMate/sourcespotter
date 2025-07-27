@@ -2,6 +2,34 @@
 <main>
 	<h1>Checksum Database Auditor</h1>
 
+	<p>
+		Source Spotter verifies that the <a href="https://sum.golang.org/">Go Module Mirror and
+		Checksum Database</a> is behaving honestly, and has not presented inconsistent information
+		to clients.
+	</p>
+
+	<p>
+		The <a href="https://research.swtch.com/tlog">Checksum Database works</a> by putting module checksums
+		in a Merkle Tree, and periodically signing and publishing the root of the tree, called a Signed Tree Head
+		(STH).  Different parties can exchange STHs to verify that the Checksum Database has not given them inconsistent
+		information, which may indicate that the Module Mirror has served one of the parties a malicious module.
+	</p>
+	<p>
+		You can verify that your Go toolchain's view of the Checksum Database is consistent with Source Spotter's view
+		by uploading the STH from your <code>$GOPATH</code> to Source Spotter's STH Gossip endpoint:
+	</p>
+	<p>
+		<code>curl --data-binary "@$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest" https://gossip.api.{{ $.Domain }}/sum.golang.org</code>
+	</p>
+	<p>
+		Source Spotter will reply with one of the following codes:
+	</p>
+	<ul>
+		<li><code>consistent</code> - your Go toolchain and Source Spotter have been given the same information by the Checksum Database</li>
+		<li><code>inconsistent</code> - your Go toolchain and Source Spotter have been given different information by the Checksum Database, suggesting that someone has been served a malicious module; the STH will be published on this page as evidence of the Checksum Database's misbehavior</li>
+		<li><code>pending</code> - we don't know yet if this STH is consistent with other STHs that we've seen; we will audit it ASAP and publish it on this page if it's inconsistent</li>
+	</ul>
+
 	<section>
 		<h2>Monitored Databases</h2>
 
@@ -26,7 +54,7 @@
 	<section>
 		<h2>Inconsistent STHs</h2>
 
-		<p>If Source Spotter detects any STHs that are inconsistent with the Largest Verified STH shown above, they will be disclosed here:</p>
+		<p>If Source Spotter detects an STH that is inconsistent with the checksum database's Largest Verified STH shown above, it will be disclosed here:</p>
 
 		<table>
 			<thead>
@@ -66,6 +94,29 @@
 				{{ end }}
 			</tbody>
 		</table>
+	</section>
+	<section>
+		<h2>Gossip</h2>
+
+		<p>
+			To retrieve the latest STH that we've observed, <code>GET</code> the gossip endpoint, <code>https://gossip.api.{{ $.Domain }}/<var>$GOSUMDB</var></code>
+		</p>
+
+		<p>
+			For example, the gossip endpoint for sum.golang.org is <code><a href="https://gossip.api.{{ $.Domain }}/sum.golang.org">https://gossip.api.{{ $.Domain }}/sum.golang.org</a></code>
+		</p>
+
+		<p>
+			To upload an STH that you've observed, <code>POST</code> it to the gossip endpoint.
+		</p>
+
+		<p>
+			For example, to upload the STH that your Go toolchain has observed for sum.golang.org, you can run:
+		</p>
+
+		<p>
+			<code>curl --data-binary "@$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest" https://gossip.api.{{ $.Domain }}/sum.golang.org</code>
+		</p>
 	</section>
 </main>
 {{ end }}
