@@ -40,42 +40,9 @@ import (
 
 	"golang.org/x/mod/semver"
 	"software.sslmate.com/src/sourcespotter"
+	"software.sslmate.com/src/sourcespotter/internal/atom"
 	"src.agwa.name/go-dbutil"
 )
-
-// Atom feed structures
-
-type atomFeed struct {
-	XMLName xml.Name   `xml:"feed"`
-	Xmlns   string     `xml:"xmlns,attr"`
-	ID      string     `xml:"id"`
-	Title   string     `xml:"title"`
-	Updated string     `xml:"updated"`
-	Author  atomPerson `xml:"author"`
-	Link    atomLink   `xml:"link"`
-	Entries []atomItem `xml:"entry"`
-}
-
-type atomItem struct {
-	Title   string      `xml:"title"`
-	ID      string      `xml:"id"`
-	Updated string      `xml:"updated"`
-	Content atomContent `xml:"content"`
-}
-
-type atomContent struct {
-	Type string `xml:"type,attr"`
-	Body string `xml:",chardata"`
-}
-
-type atomPerson struct {
-	Name string `xml:"name"`
-}
-
-type atomLink struct {
-	Rel  string `xml:"rel,attr,omitempty"`
-	Href string `xml:"href,attr"`
-}
 
 func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
@@ -93,12 +60,12 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 	}
 
 	feedURL := "https://" + sourcespotter.Domain + "/toolchain/failures.atom"
-	feed := atomFeed{
+	feed := atom.Feed{
 		Xmlns:  "http://www.w3.org/2005/Atom",
 		ID:     feedURL,
 		Title:  "Go Toolchain Build Failures",
-		Author: atomPerson{Name: "Source Spotter on " + sourcespotter.Domain},
-		Link:   atomLink{Rel: "self", Href: feedURL},
+		Author: atom.Person{Name: "Source Spotter on " + sourcespotter.Domain},
+		Link:   atom.Link{Rel: "self", Href: feedURL},
 	}
 	if len(rows) > 0 {
 		feed.Updated = rows[0].InsertedAt.UTC().Format(time.RFC3339Nano)
@@ -107,7 +74,7 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 	}
 
 	for _, row := range rows {
-		entry := atomItem{
+		entry := atom.Entry{
 			Title:   fmt.Sprintf("%s %s", row.Version, row.Status),
 			ID:      fmt.Sprintf("%s#%d-%s", feedURL, row.InsertedAt.UnixNano(), row.Version),
 			Updated: row.InsertedAt.UTC().Format(time.RFC3339Nano),
@@ -138,7 +105,7 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 				log.Printf("error presigning zip %s: %s", zipKey, err)
 			}
 		}
-		entry.Content = atomContent{Type: "text", Body: body}
+		entry.Content = atom.Content{Type: "text", Body: body}
 		feed.Entries = append(feed.Entries, entry)
 	}
 
