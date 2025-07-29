@@ -4,11 +4,14 @@ body {
 	background: white;
 	color: black;
 }
+p, li {
+	line-height: 150%;
+}
 main {
-	margin: 1rem;
+	margin: 1.5rem 2rem;
 }
 a {
-	color: black;
+	color: #338;
 	text-decoration: underline;
 }
 .header {
@@ -16,7 +19,7 @@ a {
 	justify-content: space-between;
 	align-items: center;
 	background-color: steelblue;
-	padding: 0 1rem;
+	padding: 0 2rem;
 	color: white;
 	height: 3.5rem;
 	position: relative;

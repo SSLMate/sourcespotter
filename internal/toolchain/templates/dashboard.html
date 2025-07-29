@@ -1,10 +1,36 @@
 {{ define "content" }}
 <main>
-	<h1>Toolchain Builds</h1>
+	<h1>Toolchain Reproducibility</h1>
+
+	<p>
+		Source Spotter verifies that the Go toolchains published in the Go Module Proxy
+		can be reproduced from source code. This provides assurance that
+		when the go command <a href="https://go.dev/doc/toolchain">automatically downloads a binary toolchain</a>,
+		it downloads the exact same bytes that you would get if you manually
+		downloaded and compiled the toolchain from source.
+	</p>
+	<p>
+		Since the checksums of toolchains are published in the
+		<a href="https://go.dev/ref/mod#checksum-database">Go Checksum Database</a>, and Source Spotter
+		<a href="/sumdb/">audits the Checksum Database</a>, it would be difficult for
+		Google to serve a backdoored binary to clients without being detected by Source Spotter.
+	</p>
+
+	<p>
+		Source Spotter was developed by <a href="https://www.agwa.name/">Andrew Ayer</a>
+		and the instance at sourcespotter.com
+		is operated by <a href="https://sslmate.com/">SSLMate</a> as a public service
+		to the Go community.  We are independent
+		of Google and sourcespotter.com does not use any Google infrastructure.
+		Source Spotter is <a href="https://github.com/SSLMate/sourcespotter">open source</a>.
+	</p>
 
 	<section>
 			<details>
 				<summary class="h2">Verified Reproducible ({{ len .Verified }})</summary>
+				<p>
+					The following toolchains have been reproduced from source:
+				</p>
 				<ul class="versionlist">
 						{{ range .Verified }}
 								<li>{{ . }}</li>
@@ -15,6 +41,9 @@
 	<section>
 			<details {{ if .Failures }} open {{ end }}>
 				<summary class="h2">Failures ({{ len .Failures }})</summary>
+				<p>
+					The following toolchains failed to reproduce from source:
+				</p>
 				<table>
 						<thead>
 								<tr><th>Version</th><th>Status</th><th>Time (UTC)</th><th>Artifacts</th></tr>
@@ -62,6 +91,67 @@
 					<a href="sources.csv">CSV of Sources</a>
 				</p>
 			</details>
+	</section>
+	<section>
+		<h2>Methodology</h2>
+
+		<p>
+			Source Spotter continuously downloads entries from sum.golang.org.
+			When Source Spotter sees a new version of the golang.org/toolchain module,
+			it downloads the corresponding source code from <a href="https://go.dev/dl/">go.dev/dl</a>
+			and builds it by running <code>make.bash -distpack</code> with <code>GOARCH</code> and <code>GOOS</code>
+			set appropriately.  Source Spotter computes the <a href="https://pkg.go.dev/golang.org/x/mod/sumdb/dirhash">module checksum</a> of the resulting
+			module zip file and verifies that it matches the checksum published in sum.golang.org.
+		</p>
+		<p>
+			Source Spotter builds toolchains in an AWS Lambda function running on ARM under the "provided.al2023" runtime.
+		</p>
+	</section>
+	<section>
+		<h2>Bootstrap Toolchain</h2>
+
+		<p>
+			Since the Go toolchain is written in Go, building it requires that you already
+			have an earlier version of the Go toolchain installed to bootstrap from.
+		</p>
+
+		<p>
+			When reproducing Go 1.21, 1.22, and 1.23, Source Spotter uses a Go 1.20.14
+			toolchain that was <a href="https://github.com/AGWA/build-go1.20">built from source</a>
+			by bootstrapping all the way back to Go 1.4,
+			which bootstrapped from C. To mitigate <a href="https://dl.acm.org/doi/10.1145/358198.358210">Trusting Trust</a> attacks, the Go 1.20.14 toolchain was built on multiple operating
+			systems and architectures, using both gcc and clang for the Go 1.4 bootstrap. The
+			same bytes were produced every time.
+		</p>
+
+		<p>
+			When reproducing Go 1.24 or higher, Source Spotter uses a binary toolchain
+			that it has previously verified as being reproducible from source.
+		</p>
+	</section>
+	<section>
+		<h2>Caveats</h2>
+
+		<ul>
+			<li>
+				Toolchains prior to Go 1.21 are ignored by Source Spotter since they
+				are not reliably reproducible from source.
+			</li>
+			<li>
+				Darwin binaries are not byte-for-byte reproducible, since they contain
+				signatures produced by Google's private key.  Instead of comparing
+				the reproduced toolchain directly against the sumdb checksum, Source Spotter
+				downloads the toolchain published by Google, verifies that
+				it matches the sumdb checksum, strips the signatures, and then computes
+				a new checksum that doesn't cover the signatures.  The new checksum is
+				compared against the reproduced toolchain.
+			</li>
+			<li>
+				When building linux-arm toolchains for Go 1.21.1 and higher,
+				Source Spotter has to set <code>GOARM=6</code> to match the binaries
+				published by Google.
+			</li>
+		</ul>
 	</section>
 </main>
 {{ end }}

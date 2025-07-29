@@ -137,5 +137,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Internal Database Error", 500)
 		return
 	}
-	basedashboard.ServePage(w, req, "Go Toolchain Builds - Source Spotter", dashboardTemplate, dash)
+	basedashboard.ServePage(w, req, "Go Toolchain Reproducibility - Source Spotter", dashboardTemplate, dash)
 }

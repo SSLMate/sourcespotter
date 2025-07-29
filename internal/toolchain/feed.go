@@ -63,7 +63,7 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 	feed := atom.Feed{
 		Xmlns:  "http://www.w3.org/2005/Atom",
 		ID:     feedURL,
-		Title:  "Go Toolchain Build Failures",
+		Title:  "Go Toolchain Reproducibility Failures",
 		Author: atom.Person{Name: "Source Spotter on " + sourcespotter.Domain},
 		Link:   atom.Link{Rel: "self", Href: feedURL},
 	}
