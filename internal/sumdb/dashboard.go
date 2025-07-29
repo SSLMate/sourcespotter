@@ -68,6 +68,7 @@ type InconsistentSTH struct {
 	RootHash           []byte
 	CalculatedRootHash []byte
 	Signature          []byte
+	ObservedAt         time.Time
 }
 
 func (sth *InconsistentSTH) RootHashString() string {
@@ -97,6 +98,7 @@ type DuplicateRecord struct {
 	PreviousPosition uint64
 	Module           string
 	Version          string
+	ObservedAt       time.Time
 }
 
 type Dashboard struct {
@@ -127,12 +129,13 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 	}
 
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.InconsistentSTHs, `
-		SELECT
-			db.address AS "SumDB",
-			sth.tree_size AS "TreeSize",
-			sth.root_hash AS "RootHash",
-			record.root_hash AS "CalculatedRootHash",
-			sth.signature AS "Signature"
+                SELECT
+                        db.address AS "SumDB",
+                        sth.tree_size AS "TreeSize",
+                        sth.root_hash AS "RootHash",
+                        record.root_hash AS "CalculatedRootHash",
+                        sth.signature AS "Signature",
+                        sth.observed_at AS "ObservedAt"
 		FROM sth
 		JOIN db USING (db_id)
 		JOIN record ON (record.db_id, record.position) = (sth.db_id, sth.tree_size-1)
@@ -143,12 +146,13 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 	}
 
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.DuplicateRecords, `
-		SELECT
-			db.address AS "SumDB",
-			record.position AS "Position",
-			record.previous_position AS "PreviousPosition",
-			record.module AS "Module",
-			record.version AS "Version"
+                SELECT
+                        db.address AS "SumDB",
+                        record.position AS "Position",
+                        record.previous_position AS "PreviousPosition",
+                        record.module AS "Module",
+                        record.version AS "Version",
+                        record.observed_at AS "ObservedAt"
 		FROM record
 		JOIN db USING (db_id)
 		WHERE record.previous_position IS NOT NULL
