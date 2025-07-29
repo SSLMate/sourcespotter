@@ -85,9 +85,9 @@ func (s *sourceRow) DownloadedAtString() string {
 }
 
 type dashboard struct {
-	Verified  []string
-	Failures  []failureRow
-	Sources   []sourceRow
+	Verified []string
+	Failures []failureRow
+	Sources  []sourceRow
 }
 
 func loadDashboard(ctx context.Context) (*dashboard, error) {
