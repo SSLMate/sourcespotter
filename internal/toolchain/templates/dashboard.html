@@ -18,10 +18,9 @@
 
 	<p>
 		Source Spotter was developed by <a href="https://www.agwa.name/">Andrew Ayer</a>
-		and the instance at sourcespotter.com
+		and the deployment at <a href="https://sourcespotter.com/">sourcespotter.com</a>
 		is operated by <a href="https://sslmate.com/">SSLMate</a> as a public service
-		to the Go community.  We are independent
-		of Google and sourcespotter.com does not use any Google infrastructure.
+		to the Go community.  sourcespotter.com does not use any Google infrastructure.
 		Source Spotter is <a href="https://github.com/SSLMate/sourcespotter">open source</a>.
 	</p>
 
@@ -111,14 +110,14 @@
 		<h2>Bootstrap Toolchain</h2>
 
 		<p>
-			Since the Go toolchain is written in Go, building it requires that you already
-			have an earlier version of the Go toolchain installed to bootstrap from.
+			Since the Go toolchain is written in Go, building it requires
+			an earlier version of the toolchain to be installed already.
 		</p>
 
 		<p>
 			When reproducing Go 1.21, 1.22, and 1.23, Source Spotter uses a Go 1.20.14
 			toolchain that was <a href="https://github.com/AGWA/build-go1.20">built from source</a>
-			by bootstrapping all the way back to Go 1.4,
+			by bootstrapping all the way from Go 1.4,
 			which bootstrapped from C. To mitigate <a href="https://dl.acm.org/doi/10.1145/358198.358210">Trusting Trust</a> attacks, the Go 1.20.14 toolchain was built on multiple operating
 			systems and architectures, using both gcc and clang for the Go 1.4 bootstrap. The
 			same bytes were produced every time.
