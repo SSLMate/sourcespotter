@@ -85,13 +85,15 @@ func (s *sourceRow) DownloadedAtString() string {
 }
 
 type dashboard struct {
+	Domain   string
 	Verified []string
 	Failures []failureRow
 	Sources  []sourceRow
 }
 
 func loadDashboard(ctx context.Context) (*dashboard, error) {
-	dash := new(dashboard)
+	dash := &dashboard{Domain: sourcespotter.Domain}
+
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dash.Verified, `SELECT version FROM toolchain_build WHERE status='equal'`); err != nil {
 		return nil, err
 	}

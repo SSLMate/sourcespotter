@@ -45,7 +45,7 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	feedURL := "https://" + sourcespotter.Domain + "/sumdb/failures.atom"
+	feedURL := "https://feeds.api." + sourcespotter.Domain + "/sumdb/failures.atom"
 	feed := atom.Feed{
 		Xmlns:  "http://www.w3.org/2005/Atom",
 		ID:     feedURL,

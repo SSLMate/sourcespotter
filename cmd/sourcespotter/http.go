@@ -42,14 +42,17 @@ func newHTTPServer() *http.Server {
 	domain := sourcespotter.Domain
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET "+domain+"/{$}", dashboard.ServeHome)
+	// web dashboard
 	mux.Handle("GET "+domain+"/assets/", http.FileServerFS(dashboard.Assets))
+	mux.HandleFunc("GET "+domain+"/{$}", dashboard.ServeHome)
 	mux.HandleFunc("GET "+domain+"/sumdb/{$}", sumdb.ServeDashboard)
-	mux.HandleFunc("GET "+domain+"/sumdb/failures.atom", sumdb.ServeFailuresAtom)
 	mux.HandleFunc("GET "+domain+"/toolchain/{$}", toolchain.ServeDashboard)
-	mux.HandleFunc("GET "+domain+"/toolchain/failures.atom", toolchain.ServeFailuresAtom)
-	mux.HandleFunc("GET "+domain+"/toolchain/sources.csv", toolchain.ServeSourcesCSV)
-	mux.HandleFunc("GET "+domain+"/toolchain/toolchains.csv", toolchain.ServeToolchainsCSV)
+	// feeds API
+	mux.HandleFunc("GET feeds.api."+domain+"/sumdb/failures.atom", sumdb.ServeFailuresAtom)
+	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/failures.atom", toolchain.ServeFailuresAtom)
+	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/sources.csv", toolchain.ServeSourcesCSV)
+	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/toolchains.csv", toolchain.ServeToolchainsCSV)
+	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
 
