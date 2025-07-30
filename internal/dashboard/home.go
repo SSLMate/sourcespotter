@@ -27,8 +27,15 @@ package dashboard
 
 import (
 	"net/http"
+
+	"software.sslmate.com/src/sourcespotter"
 )
 
-func ServeHome(w http.ResponseWriter, r *http.Request) {
-	// TODO
+func ServeHome(w http.ResponseWriter, req *http.Request) {
+	var dashboard struct {
+		Domain string
+	}
+	dashboard.Domain = sourcespotter.Domain
+
+	ServePage(w, req, "Source Spotter - Supply Chain Security for Go", homeTemplate, dashboard)
 }

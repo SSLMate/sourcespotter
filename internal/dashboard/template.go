@@ -45,6 +45,8 @@ var templateFuncs = template.FuncMap{}
 
 var baseTemplate = template.Must(template.New("base.html").Funcs(templateFuncs).ParseFS(templates, "templates/base.html"))
 
+var homeTemplate = ParseTemplate(templates, "templates/home.html")
+
 func ParseTemplate(fs fs.FS, patterns ...string) *template.Template {
 	return template.Must(template.Must(baseTemplate.Clone()).ParseFS(fs, patterns...))
 }
