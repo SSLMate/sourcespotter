@@ -114,14 +114,11 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.SumDBs, `
 		SELECT
 			db.address AS "Address",
-			largest_sth.tree_size AS "LargestSTHSize",
-			largest_sth.observed_at AS "LargestSTHTime",
+			(SELECT MAX(tree_size) FROM sth WHERE db_id = db.db_id) AS "LargestSTHSize",
+			(SELECT MAX(observed_at) FROM sth WHERE db_id = db.db_id AND tree_size = (SELECT MAX(tree_size) FROM sth WHERE db_id = db.db_id)) AS "LargestSTHTime",
 			db.download_position->>'size' AS "DownloadSize",
 			db.verified_position->>'size' AS "VerifiedSize"
 		FROM db
-		LEFT JOIN LATERAL (
-			SELECT DISTINCT ON (db_id) * FROM sth ORDER BY db_id, tree_size DESC
-		) largest_sth USING (db_id)
 		WHERE db.enabled
 		ORDER BY db.address
 	`); err != nil {
@@ -156,7 +153,7 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 		FROM record
 		JOIN db USING (db_id)
 		WHERE record.previous_position IS NOT NULL
-		ORDER BY (record.db_id, record.position)
+		ORDER BY record.db_id, record.position
 	`); err != nil {
 		return nil, err
 	}

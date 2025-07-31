@@ -85,6 +85,8 @@ CREATE TABLE toolchain_build (
 	PRIMARY KEY (version)
 );
 
+CREATE INDEX toolchain_build_failures ON toolchain_build (inserted_at) WHERE status NOT IN ('equal', 'skipped');
+
 CREATE TABLE toolchain_source (
 	version		text NOT NULL, -- e.g. "go1.21.0"
 	url		text NOT NULL,
