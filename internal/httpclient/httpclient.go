@@ -96,6 +96,38 @@ func Upload(ctx context.Context, uploadURL string, contentType string, body io.R
 	return nil
 }
 
+func UploadFile(ctx context.Context, uploadURL string, contentType string, filename string) error {
+	file, err := os.Open(filename)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	info, err := file.Stat()
+	if err != nil {
+		return err
+	}
+	fileSize := info.Size()
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPut, uploadURL, nil)
+	if err != nil {
+		return err
+	}
+	req.ContentLength = fileSize
+	req.Body = file
+	req.GetBody = func() (io.ReadCloser, error) { return os.Open(filename) }
+	req.Header.Set("Content-Type", contentType)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	respBody, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return &url.Error{Op: "Put", URL: uploadURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
+	}
+	return nil
+}
+
 func CopyToTempFile(r io.Reader) (filename string, err error) {
 	f, err := os.CreateTemp("", "tmp")
 	if err != nil {
