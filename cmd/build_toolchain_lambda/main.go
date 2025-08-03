@@ -101,7 +101,7 @@ func handler(ctx context.Context, event toolchainlambda.Event) error {
 	var errs []error
 	if err := cmd.Run(); err != nil {
 		errs = append(errs, fmt.Errorf("build failed: %w", err))
-	} else if err := uploadFile(ctx, event.ZipUploadURL, toolchainlambda.ZipContentType, zipfile); err != nil {
+	} else if err := httpclient.UploadFile(ctx, event.ZipUploadURL, toolchainlambda.ZipContentType, zipfile); err != nil {
 		errs = append(errs, fmt.Errorf("uploading zip failed: %w", err))
 	}
 
@@ -195,14 +195,6 @@ func downloadToolchain(ctx context.Context, destdir string, zipURL string, expec
 		return err
 	}
 	return nil
-}
-
-func uploadFile(ctx context.Context, url, contentType, path string) error {
-	f, err := os.ReadFile(path)
-	if err != nil {
-		return err
-	}
-	return httpclient.Upload(ctx, url, contentType, bytes.NewReader(f))
 }
 
 func renameGoModFiles(root string) error {
