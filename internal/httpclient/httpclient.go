@@ -35,30 +35,38 @@ import (
 	"os"
 )
 
+func doRequest(req *http.Request) (*http.Response, error) {
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		defer resp.Body.Close()
+		respBody, _ := io.ReadAll(resp.Body)
+		return nil, &url.Error{Op: req.Method, URL: req.URL.String(), Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
+	}
+	return resp, nil
+}
+
 func Download(ctx context.Context, getURL string) (io.ReadCloser, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, getURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := doRequest(req)
 	if err != nil {
 		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		return nil, &url.Error{Op: "Get", URL: getURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
 	}
 	return resp.Body, nil
 }
 
 func DownloadBytes(ctx context.Context, getURL string) ([]byte, error) {
-	r, err := Download(ctx, getURL)
+	body, err := Download(ctx, getURL)
 	if err != nil {
 		return nil, err
 	}
-	defer r.Close()
-	data, err := io.ReadAll(r)
+	defer body.Close()
+	data, err := io.ReadAll(body)
 	if err != nil {
 		return nil, &url.Error{Op: "Get", URL: getURL, Err: err}
 	}
@@ -66,12 +74,12 @@ func DownloadBytes(ctx context.Context, getURL string) ([]byte, error) {
 }
 
 func DownloadToTempFile(ctx context.Context, getURL string) (string, error) {
-	r, err := Download(ctx, getURL)
+	body, err := Download(ctx, getURL)
 	if err != nil {
 		return "", err
 	}
-	defer r.Close()
-	filename, err := CopyToTempFile(r)
+	defer body.Close()
+	filename, err := CopyToTempFile(body)
 	if err != nil {
 		return "", &url.Error{Op: "Get", URL: getURL, Err: err}
 	}
@@ -84,15 +92,12 @@ func Upload(ctx context.Context, uploadURL string, contentType string, body io.R
 		return err
 	}
 	req.Header.Set("Content-Type", contentType)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := doRequest(req)
 	if err != nil {
 		return err
 	}
-	respBody, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &url.Error{Op: "Put", URL: uploadURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
-	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
 	return nil
 }
 
@@ -116,15 +121,13 @@ func UploadFile(ctx context.Context, uploadURL string, contentType string, filen
 	req.Body = file
 	req.GetBody = func() (io.ReadCloser, error) { return os.Open(filename) }
 	req.Header.Set("Content-Type", contentType)
-	resp, err := http.DefaultClient.Do(req)
+
+	resp, err := doRequest(req)
 	if err != nil {
 		return err
 	}
-	respBody, _ := io.ReadAll(resp.Body)
-	resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return &url.Error{Op: "Put", URL: uploadURL, Err: fmt.Errorf("%s: %s", resp.Status, bytes.TrimSpace(respBody))}
-	}
+	defer resp.Body.Close()
+	io.Copy(io.Discard, resp.Body)
 	return nil
 }
 
