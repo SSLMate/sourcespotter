@@ -14,11 +14,18 @@ a {
 	color: #338;
 	text-decoration: underline;
 }
+.inner {
+	max-width: 80rem;
+	margin: 0 auto;
+	box-sizing: border-box;
+}
 .header {
+	background-color: steelblue;
+}
+.header > .inner {
 	display: flex;
 	justify-content: space-between;
 	align-items: center;
-	background-color: steelblue;
 	padding: 0 2rem;
 	color: white;
 	height: 3.5rem;

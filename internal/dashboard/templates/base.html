@@ -8,23 +8,27 @@
   </head>
   <body>
     <header class="header">
-      <div class="header-left">Source Spotter</div>
-      <a class="header-menu" onclick="document.getElementById('nav').classList.toggle('header-right-show'); return false" href="javascript:void(0)">Menu &#x25BE;</a>
-      <nav class="header-right" id="nav">
-        <a href="/" class='header-link {{ if eq .Request.URL.Path "/" }}header-selected{{ end }}'>About</a>
-        <a href="/sumdb/" class='header-link {{ if eq .Request.URL.Path "/sumdb/" }}header-selected{{ end }}'>sumdb</a>
-        <a href="/toolchain/" class='header-link {{ if eq .Request.URL.Path "/toolchain/" }}header-selected{{ end }}'>Toolchains</a>
-      </nav>
+      <div class="inner">
+        <div class="header-left">Source Spotter</div>
+        <a class="header-menu" onclick="document.getElementById('nav').classList.toggle('header-right-show'); return false" href="javascript:void(0)">Menu &#x25BE;</a>
+        <nav class="header-right" id="nav">
+          <a href="/" class='header-link {{ if eq .Request.URL.Path "/" }}header-selected{{ end }}'>About</a>
+          <a href="/sumdb/" class='header-link {{ if eq .Request.URL.Path "/sumdb/" }}header-selected{{ end }}'>sumdb</a>
+          <a href="/toolchain/" class='header-link {{ if eq .Request.URL.Path "/toolchain/" }}header-selected{{ end }}'>Toolchains</a>
+        </nav>
+	  </div>
     </header>
-	{{ block "content" .Body }}{{ end }}
-	<footer>
-		{{ with .BuildInfo }}
-			<p>
-				{{ .Main.Path }}@{{ .Main.Version }}
-				{{ with .Main.Sum }} ({{ . }}) {{ end }}
-				<a href="https://github.com/SSLMate/sourcespotter/">GitHub</a>
-			</p>
-		{{ end }}
-	</footer>
+	<div class="inner">
+	  {{ block "content" .Body }}{{ end }}
+	  <footer>
+		  {{ with .BuildInfo }}
+			  <p>
+				  {{ .Main.Path }}@{{ .Main.Version }}
+				  {{ with .Main.Sum }} ({{ . }}) {{ end }}
+				  <a href="https://github.com/SSLMate/sourcespotter/">GitHub</a>
+			  </p>
+		  {{ end }}
+	  </footer>
+    </div>
   </body>
 </html>
