@@ -23,5 +23,17 @@
 	<p>
 		<a href="https://feeds.api.{{ $.Domain }}/telemetry/counters.csv">CSV of Counters</a>
 	</p>
+	<h2>Errors</h2>
+	<p>Source Spotter was unable to process the following telemetry configs:</p>
+	<table>
+		<thead>
+			<tr><th>Version</th><th style="white-space:nowrap">Time (UTC)</th><th>Error</th></tr>
+		</thead>
+		<tbody>
+			{{ range .Errors }}
+				<tr><td style="white-space:nowrap">{{ .Version }}</td><td style="white-space:nowrap">{{ .Time.Format "2006-01-02 15:04" }}</td><td>{{ .Error }}</td></tr>
+			{{ end }}
+		</tbody>
+	</table>
 </main>
 {{ end }}

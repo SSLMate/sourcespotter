@@ -5,6 +5,7 @@ import (
 	"embed"
 	"log"
 	"net/http"
+	"time"
 
 	"software.sslmate.com/src/sourcespotter"
 	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
@@ -22,14 +23,24 @@ type counterRow struct {
 	Name    string `sql:"name"`
 }
 
+type errorRow struct {
+	Version string    `sql:"version"`
+	Time    time.Time `sql:"inserted_at"`
+	Error   string    `sql:"error"`
+}
+
 type dashboard struct {
 	Domain   string
 	Counters []counterRow
+	Errors   []errorRow
 }
 
 func loadDashboard(ctx context.Context) (*dashboard, error) {
 	dash := &dashboard{Domain: sourcespotter.Domain}
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dash.Counters, `select distinct program,type,name from telemetry_counter order by program,type,name`); err != nil {
+		return nil, err
+	}
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dash.Errors, `select version, inserted_at, error from telemetry_config where error is not null order by inserted_at desc`); err != nil {
 		return nil, err
 	}
 	return dash, nil
