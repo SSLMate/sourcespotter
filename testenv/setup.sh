@@ -26,6 +26,8 @@ SET ROLE sourcespotter;
 \copy record from 'testenv/testdata/record'
 \copy toolchain_source from 'testenv/testdata/toolchain_source'
 \copy toolchain_build from 'testenv/testdata/toolchain_build'
+\copy telemetry_config from 'testenv/testdata/telemetry_config'
+\copy telemetry_counter from 'testenv/testdata/telemetry_counter'
 SELECT setval('db_db_id_seq', (SELECT MAX(db_id) FROM db), true);
 SELECT setval('sth_sth_id_seq', (SELECT MAX(sth_id) FROM sth), true);
 PSQL
