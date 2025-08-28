@@ -48,11 +48,13 @@ func main() {
 		config    string
 		sumdb     bool
 		toolchain bool
+		telemetry bool
 		listen    []string
 	}
 	flag.StringVar(&flags.config, "config", "", "Path to configuration file")
 	flag.BoolVar(&flags.sumdb, "sumdb", false, "Enable sumdb monitoring")
 	flag.BoolVar(&flags.toolchain, "toolchain", false, "Enable toolchain auditing")
+	flag.BoolVar(&flags.telemetry, "telemetry", false, "Enable telemetry config monitoring")
 	flag.Func("listen", "Run HTTP server on `LISTENER`, in go-listener syntax (repeatable)", func(arg string) error {
 		flags.listen = append(flags.listen, arg)
 		return nil
@@ -122,6 +124,9 @@ func main() {
 	}
 	if flags.toolchain {
 		go auditToolchains()
+	}
+	if flags.telemetry {
+		go refreshTelemetryCounters()
 	}
 
 	select {}

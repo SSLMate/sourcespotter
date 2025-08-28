@@ -96,4 +96,22 @@ CREATE TABLE toolchain_source (
 	PRIMARY KEY (version)
 );
 
+CREATE TABLE telemetry_config (
+	version		text NOT NULL,
+	inserted_at	timestamptz NOT NULL DEFAULT statement_timestamp(),
+
+	PRIMARY KEY (version)
+);
+
+CREATE TABLE telemetry_counter (
+	version text NOT NULL,
+	program text NOT NULL,
+	name	text NOT NULL,
+	type	text NOT NULL,
+	rate	int NOT NULL,
+	depth	int,
+
+	PRIMARY KEY (version, program, name)
+);
+
 COMMIT;
