@@ -44,40 +44,48 @@ import (
 // referenced in the record table but missing from the telemetry_config table.
 func RefreshCounters(ctx context.Context) error {
 	var rows []struct {
-		Version     string
-		GoModSHA256 []byte `db:"gomod_sha256"`
+		Version      string `sql:"version"`
+		SourceSHA256 []byte `sql:"source_sha256"`
 	}
-	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &rows, `SELECT version, gomod_sha256 FROM record WHERE module = 'golang.org/x/telemetry/config' AND NOT EXISTS (SELECT 1 FROM telemetry_config WHERE telemetry_config.version = record.version)`); err != nil {
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &rows, `SELECT version, source_sha256 FROM record WHERE module = 'golang.org/x/telemetry/config' AND NOT EXISTS (SELECT 1 FROM telemetry_config WHERE telemetry_config.version = record.version)`); err != nil {
 		return fmt.Errorf("error querying telemetry configs: %w", err)
 	}
 	for _, r := range rows {
-		if err := refreshVersion(ctx, r.Version, r.GoModSHA256); err != nil {
+		if err := refreshVersion(ctx, r.Version, r.SourceSHA256); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func refreshVersion(ctx context.Context, version string, gomodSHA256 []byte) error {
+func recordConfigError(ctx context.Context, version string, configErr error) error {
+	errString := configErr.Error()
+	if _, err := sourcespotter.DB.ExecContext(ctx, `INSERT INTO telemetry_config (version, error) VALUES ($1, $2)`, version, errString); err != nil {
+		return fmt.Errorf("error inserting telemetry_config row with error %q: %w", errString, err)
+	}
+	return nil
+}
+
+func refreshVersion(ctx context.Context, version string, sourceSHA256 []byte) error {
 	url := fmt.Sprintf("https://proxy.golang.org/golang.org/x/telemetry/config/@v/%s.zip", version)
 	filename, err := httpclient.DownloadToTempFile(ctx, url)
 	if err != nil {
-		return fmt.Errorf("error downloading telemetry config %s: %w", version, err)
+		return recordConfigError(ctx, version, fmt.Errorf("error downloading mozile zip: %w", err))
 	}
 	defer os.Remove(filename)
 
 	hash, err := dirhash.HashZip(filename, dirhash.Hash1)
 	if err != nil {
-		return fmt.Errorf("error hashing telemetry config %s: %w", version, err)
+		return recordConfigError(ctx, version, fmt.Errorf("error hashing module zip: %w", err))
 	}
-	expected := "h1:" + base64.StdEncoding.EncodeToString(gomodSHA256)
+	expected := "h1:" + base64.StdEncoding.EncodeToString(sourceSHA256)
 	if hash != expected {
-		return fmt.Errorf("telemetry config %s has unexpected hash %s (expected %s)", version, hash, expected)
+		return recordConfigError(ctx, version, fmt.Errorf("module zip has unexpected hash %s (expected %s)", hash, expected))
 	}
 
 	cfg, err := readConfig(filename, version)
 	if err != nil {
-		return err
+		return recordConfigError(ctx, version, err)
 	}
 	return insertConfig(ctx, version, cfg)
 }
@@ -87,11 +95,11 @@ type configJSON struct {
 		Name     string
 		Counters []struct {
 			Name string
-			Rate int
+			Rate float32
 		}
 		Stacks []struct {
 			Name  string
-			Rate  int
+			Rate  float32
 			Depth int
 		}
 	}

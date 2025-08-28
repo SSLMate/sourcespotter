@@ -99,6 +99,7 @@ CREATE TABLE toolchain_source (
 CREATE TABLE telemetry_config (
 	version		text NOT NULL,
 	inserted_at	timestamptz NOT NULL DEFAULT statement_timestamp(),
+	error		text,
 
 	PRIMARY KEY (version)
 );
@@ -108,10 +109,9 @@ CREATE TABLE telemetry_counter (
 	program text NOT NULL,
 	name	text NOT NULL,
 	type	text NOT NULL,
-	rate	int NOT NULL,
-	depth	int,
-
-	PRIMARY KEY (version, program, name)
+	rate	real NOT NULL,
+	depth	int
 );
+CREATE INDEX telemetry_counter_index ON telemetry_counter (program, name, version);
 
 COMMIT;
