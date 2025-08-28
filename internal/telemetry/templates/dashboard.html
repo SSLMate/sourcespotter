@@ -1,0 +1,27 @@
+{{ define "content" }}
+<main>
+	<h1>Telemetry Counters</h1>
+	<p>
+		This page shows every counter name ever published in a <a href="https://telemetry.go.dev/">Go telemetry</a> upload config.
+		You can use this page to see what kind of information the Go toolchain uploads if you opt in to telemetry.
+		If any of the counter names look suspicious, like they're trying to probe private
+		information, it would be evidence that Go telemetry violates privacy.
+		Since the checksum of every telemetry upload
+		config is published in the Go Checksum Database, it would be difficult for Google
+		to conceal malicious counter names from this page.  <a href="https://research.swtch.com/telemetry-intro">Read more about transparent telemetry</a>
+	</p>
+	<table>
+		<thead>
+			<tr><th>Program</th><th>Type</th><th>Name</th></tr>
+		</thead>
+		<tbody>
+			{{ range .Counters }}
+				<tr><td>{{ .Program }}</td><td>{{ .Type }}</td><td><code>{{ .Name }}</code></td></tr>
+			{{ end }}
+		</tbody>
+	</table>
+	<p>
+		<a href="https://feeds.api.{{ $.Domain }}/telemetry/counters.csv">CSV of Counters</a>
+	</p>
+</main>
+{{ end }}
