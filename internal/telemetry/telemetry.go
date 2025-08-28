@@ -31,7 +31,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
-	"io"
+	"io/fs"
 	"os"
 
 	"golang.org/x/mod/sumdb/dirhash"
@@ -70,7 +70,7 @@ func refreshVersion(ctx context.Context, version string, sourceSHA256 []byte) er
 	url := fmt.Sprintf("https://proxy.golang.org/golang.org/x/telemetry/config/@v/%s.zip", version)
 	filename, err := httpclient.DownloadToTempFile(ctx, url)
 	if err != nil {
-		return recordConfigError(ctx, version, fmt.Errorf("error downloading mozile zip: %w", err))
+		return recordConfigError(ctx, version, fmt.Errorf("error downloading module zip: %w", err))
 	}
 	defer os.Remove(filename)
 
@@ -109,30 +109,16 @@ func readConfig(filename, version string) (*configJSON, error) {
 	path := fmt.Sprintf("golang.org/x/telemetry/config@%s/config.json", version)
 	z, err := zip.OpenReader(filename)
 	if err != nil {
-		return nil, fmt.Errorf("error opening telemetry config zip: %w", err)
+		return nil, fmt.Errorf("error opening module zip: %w", err)
 	}
 	defer z.Close()
-	var data []byte
-	for _, f := range z.File {
-		if f.Name == path {
-			rc, err := f.Open()
-			if err != nil {
-				return nil, fmt.Errorf("error opening %q in zip: %w", path, err)
-			}
-			defer rc.Close()
-			data, err = io.ReadAll(rc)
-			if err != nil {
-				return nil, fmt.Errorf("error reading %q in zip: %w", path, err)
-			}
-			break
-		}
-	}
-	if data == nil {
-		return nil, fmt.Errorf("telemetry config zip missing %q", path)
+	data, err := fs.ReadFile(z, path)
+	if err != nil {
+		return nil, fmt.Errorf("error reading config.json from module zip: %w", err)
 	}
 	var cfg configJSON
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return nil, fmt.Errorf("error parsing telemetry config: %w", err)
+		return nil, fmt.Errorf("error parsing %q: %w", path, err)
 	}
 	return &cfg, nil
 }
