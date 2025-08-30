@@ -49,7 +49,7 @@ func ServeCountersCSV(w http.ResponseWriter, req *http.Request) {
 	}
 	w.Header().Set("Content-Type", "text/csv; charset=UTF-8; header=present")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "public, max-age=300, must-revalidate")
+	w.Header().Set("Cache-Control", "public, max-age=86400, must-revalidate")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
 	cw := csv.NewWriter(w)
