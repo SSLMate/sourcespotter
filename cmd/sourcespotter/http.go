@@ -54,6 +54,7 @@ func newHTTPServer() *http.Server {
 	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/failures.atom", toolchain.ServeFailuresAtom)
 	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/sources.csv", toolchain.ServeSourcesCSV)
 	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/toolchains.csv", toolchain.ServeToolchainsCSV)
+	mux.HandleFunc("GET feeds.api."+domain+"/telemetry/counters.atom", telemetry.ServeCountersAtom)
 	mux.HandleFunc("GET feeds.api."+domain+"/telemetry/counters.csv", telemetry.ServeCountersCSV)
 	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
