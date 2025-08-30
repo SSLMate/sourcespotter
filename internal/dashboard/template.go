@@ -52,19 +52,21 @@ func ParseTemplate(fs fs.FS, patterns ...string) *template.Template {
 }
 
 type templateData struct {
-	Domain    string
-	BuildInfo *debug.BuildInfo
-	Request   *http.Request
-	Title     string
-	Body      any
+	Domain      string
+	BuildInfo   *debug.BuildInfo
+	Request     *http.Request
+	Title       string
+	Description string
+	Body        any
 }
 
-func ServePage(w http.ResponseWriter, req *http.Request, title string, tmpl *template.Template, body any) {
+func ServePage(w http.ResponseWriter, req *http.Request, title, description string, tmpl *template.Template, body any) {
 	data := &templateData{
-		Domain:  sourcespotter.Domain,
-		Request: req,
-		Title:   title,
-		Body:    body,
+		Domain:      sourcespotter.Domain,
+		Request:     req,
+		Title:       title,
+		Description: description,
+		Body:        body,
 	}
 	data.BuildInfo, _ = debug.ReadBuildInfo()
 	w.Header().Set("Content-Type", "text/html; charset=UTF-8")

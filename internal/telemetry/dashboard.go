@@ -53,5 +53,8 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Internal Database Error", 500)
 		return
 	}
-	basedashboard.ServePage(w, req, "Telemetry Counters - Source Spotter", dashboardTemplate, dash)
+	basedashboard.ServePage(w, req,
+		"Telemetry Counters - Source Spotter",
+		"Source Spotter tracks Go telemetry counters to ensure they respect users' privacy.",
+		dashboardTemplate, dash)
 }

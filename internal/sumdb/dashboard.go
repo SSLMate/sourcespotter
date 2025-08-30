@@ -168,5 +168,8 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Internal Database Error", 500)
 		return
 	}
-	basedashboard.ServePage(w, req, "Go Checksum Database Auditor - Source Spotter", dashboardTemplate, dashboard)
+	basedashboard.ServePage(w, req,
+		"Go Checksum Database Auditor - Source Spotter",
+		"Source Spotter verifies the consistency of the Go Checksum Database.",
+		dashboardTemplate, dashboard)
 }
