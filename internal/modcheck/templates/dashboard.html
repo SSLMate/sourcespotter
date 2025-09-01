@@ -1,0 +1,144 @@
+{{ define "content" }}
+<main>
+  <h1>Module Check</h1>
+  <form id="modcheck-form">
+    <input id="module" type="text" placeholder="module path" size="80"/>
+    <button type="submit">Check</button>
+  </form>
+  <div id="progress" hidden>Loading...</div>
+  <table id="results" hidden>
+    <thead>
+      <tr><th>Version</th><th>Status</th></tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+  <dialog id="detail-dialog">
+    <pre id="detail-content"></pre>
+    <form method="dialog"><button>Close</button></form>
+  </dialog>
+  <script>
+  const domain = "{{ .Domain }}";
+  const form = document.getElementById('modcheck-form');
+  const input = document.getElementById('module');
+  const tbody = document.querySelector('#results tbody');
+  const resultsTable = document.getElementById('results');
+  const progress = document.getElementById('progress');
+  let currentController;
+  let total=0, processed=0, errors=0;
+  function updateProgress(){
+    progress.textContent = `${processed} out of ${total} checked; ${errors} errors`;
+  }
+  function status(info){
+    if (info.Download.Error) return info.Download.Error;
+    if (info.ExpectedSum !== info.Download.Sum) return 'Sum mismatch';
+    if (info.ExpectedGoModSum !== info.Download.GoModSum) return 'GoModSum mismatch';
+    return 'Good';
+  }
+  function insertRow(info, st){
+    const tr=document.createElement('tr');
+    const t=Date.parse(info.ObservedAt);
+    tr.dataset.observedAt=t;
+    const verTd=document.createElement('td');
+    const link=document.createElement('a');
+    link.href='#';
+    link.textContent=info.Version;
+    link.addEventListener('click',e=>{
+      e.preventDefault();
+      document.getElementById('detail-content').textContent = JSON.stringify(info,null,2);
+      document.getElementById('detail-dialog').showModal();
+    });
+    verTd.appendChild(link);
+    const statusTd=document.createElement('td');
+    statusTd.textContent=st;
+    tr.appendChild(verTd);
+    tr.appendChild(statusTd);
+    const rows=tbody.querySelectorAll('tr');
+    let inserted=false;
+    for(const row of rows){
+      if(Number(row.dataset.observedAt) > t){
+        tbody.insertBefore(tr,row);
+        inserted=true;
+        break;
+      }
+    }
+    if(!inserted) tbody.appendChild(tr);
+    resultsTable.hidden=false;
+  }
+  async function fetchModule(module){
+    currentController?.abort();
+    const controller = new AbortController();
+    currentController = controller;
+    tbody.innerHTML='';
+    resultsTable.hidden=true;
+    progress.hidden=false;
+    progress.textContent='Loading...';
+    processed=0; errors=0; total=0;
+    try {
+      const resp = await fetch('https://private.api.'+domain+'/modcheck?module='+encodeURIComponent(module), {signal: controller.signal});
+      total = parseInt(resp.headers.get('Sourcespotter-Records')) || 0;
+      updateProgress();
+      const reader = resp.body.getReader();
+      const decoder = new TextDecoder();
+      let buf='';
+      while(true){
+        const {done,value}=await reader.read();
+        if(done){ if(buf){processLine(buf);} break;}
+        buf += decoder.decode(value,{stream:true});
+        const lines=buf.split('\n');
+        buf = lines.pop();
+        for(const line of lines){ processLine(line); }
+      }
+    } catch(err){
+      if(err.name !== 'AbortError') throw err;
+    } finally {
+      //if(currentController === controller) progress.hidden=true;
+    }
+  }
+  function processLine(line){
+    if(!line.trim()) return;
+    const info = JSON.parse(line);
+    const st = status(info);
+    insertRow(info, st);
+    processed++;
+    if(st !== 'Good') errors++;
+    updateProgress();
+  }
+  form.addEventListener('submit',e=>{
+    e.preventDefault();
+    const module=input.value.trim();
+    const url=new URL(window.location);
+    if(module){
+      url.searchParams.set('module',module);
+      history.pushState({module},'',url);
+      fetchModule(module);
+    }else{
+      url.searchParams.delete('module');
+      history.pushState({},'',url);
+      currentController?.abort();
+      tbody.innerHTML='';
+      resultsTable.hidden=true;
+      progress.hidden=true;
+    }
+  });
+  window.addEventListener('popstate',()=>{
+    const module=new URLSearchParams(location.search).get('module')||'';
+    input.value=module;
+    if(module){
+      fetchModule(module);
+    }else{
+      currentController?.abort();
+      tbody.innerHTML='';
+      resultsTable.hidden=true;
+      progress.hidden=true;
+    }
+  });
+  (function init(){
+    const module=new URLSearchParams(location.search).get('module')||'';
+    if(module){
+      input.value=module;
+      fetchModule(module);
+    }
+  })();
+  </script>
+</main>
+{{ end }}
