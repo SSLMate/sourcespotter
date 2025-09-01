@@ -59,6 +59,7 @@ func Serve(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "application/jsonl")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
 
 	var encoderMu sync.Mutex
