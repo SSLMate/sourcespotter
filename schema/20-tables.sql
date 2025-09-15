@@ -67,6 +67,15 @@ CREATE TABLE record (
 CREATE INDEX record_module ON record (module, version, db_id, position DESC);
 CREATE INDEX duplicate_module ON record (db_id) WHERE previous_position IS NOT NULL;
 
+CREATE TABLE authorized_record (
+        pubkey          bytea NOT NULL,
+        module          text NOT NULL,
+        version         text NOT NULL,
+        source_sha256   bytea NOT NULL,
+
+        PRIMARY KEY (pubkey, module, version)
+);
+
 CREATE TYPE toolchain_build_status AS ENUM (
 	'skipped',
 	'equal',

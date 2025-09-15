@@ -33,6 +33,7 @@ import (
 	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/modcheck"
+	"software.sslmate.com/src/sourcespotter/internal/monitor"
 	"software.sslmate.com/src/sourcespotter/internal/sths"
 	"software.sslmate.com/src/sourcespotter/internal/sumdb"
 	"software.sslmate.com/src/sourcespotter/internal/telemetry"
@@ -61,6 +62,9 @@ func newHTTPServer() *http.Server {
 	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
+	// monitoring API
+	mux.HandleFunc("POST monitor.api."+domain+"/authorized", monitor.ReceiveAuthorized)
+	mux.HandleFunc("GET monitor.api."+domain+"/versions.atom", monitor.ServeVersionsAtom)
 	// private API
 	mux.HandleFunc("GET private.api."+domain+"/modcheck", modcheck.Serve)
 
