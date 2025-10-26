@@ -40,9 +40,9 @@
         <section>
                 <h2>Try It Out</h2>
 
-                <p>Enter the module path and optional Ed25519 public key to open the feed in a new tab.</p>
+                <p>Enter the module path and optional Ed25519 public key to open the feed.</p>
 
-                <form class="feed-form" action="https://feeds.api.{{ $.Domain }}/modules/versions.atom" method="get" target="_blank">
+                <form class="feed-form" action="https://feeds.api.{{ $.Domain }}/modules/versions.atom" method="get">
                         <div>
                                 <label for="module">Module <span aria-hidden="true">*</span></label><br/>
                                 <input id="module" name="module" type="text" required placeholder="example.com/module"/>
