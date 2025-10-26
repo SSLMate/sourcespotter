@@ -92,8 +92,8 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 		Link:   atom.Link{Rel: "self", Href: feedURL},
 	}
 	var latest time.Time
-	for rows.Next() {
-		if len(feed.Entries) == maxFeedEntries {
+	for numRows := 0; rows.Next(); numRows++ {
+		if numRows == maxFeedEntries {
 			http.Error(w, fmt.Sprintf("Sorry, there are more than %d versions matching %s and we can't create a feed that large", maxFeedEntries, module), http.StatusInternalServerError)
 			return
 		}
