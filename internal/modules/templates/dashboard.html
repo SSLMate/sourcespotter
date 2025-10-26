@@ -1,0 +1,85 @@
+{{ define "content" }}
+<main>
+        <h1>Module Monitoring</h1>
+
+        <p>
+                Source Spotter records every module version served by the 
+				<a href="https://sum.golang.org/">Go Module Mirror and Checksum Database</a>.
+				You can subscribe to an Atom feed of those observations to make sure the module mirror is faithfully
+				serving the same versions that you have released.
+		</p>
+
+		<p>
+				If you're interested in email or webhook notifications,
+				consider <a href="https://www.gopherwatch.org/">GopherWatch</a>.
+        </p>
+
+        <section>
+                <h2>Atom Feed</h2>
+
+                <p>
+                        The feed is available at <code>https://monitor.api.{{ $.Domain }}/versions.atom</code>.
+                        It returns up to 10,000 versions (excluding pre-release versions) ordered by the time we observed them.
+                </p>
+
+                <p>The feed accepts the following query parameters:</p>
+                <ul>
+                        <li><code>module</code> (required) &ndash; the module path to inspect. Append a trailing slash (<code>/</code>)
+                                to match all modules with the given prefix.</li>
+                        <li><code>ed25519</code> (optional) &ndash; a base64-encoded public key. When supplied, the feed only returns
+                                versions that have <strong>not</strong> been authorized by that key (see below).</li>
+                </ul>
+
+                <p>
+                        For example, requesting <code>?module=example.com/module</code> returns the versions of exactly that module,
+                        while <code>?module=example.com/</code> returns every module whose path starts with
+                        <code>example.com/</code>.
+                </p>
+        </section>
+
+        <section>
+                <h2>Try It Out</h2>
+
+                <p>Enter the module path and optional Ed25519 public key to open the feed in a new tab.</p>
+
+                <form class="feed-form" action="https://monitor.api.{{ $.Domain }}/versions.atom" method="get" target="_blank">
+                        <div>
+                                <label for="module">Module <span aria-hidden="true">*</span></label><br/>
+                                <input id="module" name="module" type="text" required placeholder="example.com/module"/>
+                        </div>
+                        <div>
+                                <label for="ed25519">Ed25519 public key (base64, optional)</label><br/>
+                                <input id="ed25519" name="ed25519" type="text" placeholder="MCowBQYDK2VwAyEA..."/>
+                        </div>
+                        <div>
+                                <button type="submit">Open Atom Feed</button>
+                        </div>
+                </form>
+        </section>
+
+        <section>
+                <h2>Authorizing Versions (Experimental)</h2>
+
+                <p>
+                        Source Spotter can accept go.sum files signed by an Ed25519 key to mark module versions
+						as authorized.  When you supply the public key's base64 representation via the
+                        <code>ed25519</code> parameter, the feed filters out the versions that have already been
+                        authorized, allowing you to focus on unexpected releases.
+				</p>
+
+				<p>
+						To upload an authorization, POST the JSON serialization of the following Go struct
+						(containing an Ed25519 public key, a go.sum file, and an Ed25519 signature over
+						the go.sum file)
+                        to <code>https://monitor.api.{{ $.Domain }}/authorized</code>:
+                </p>
+
+				<pre>struct {
+	Ed25519   []byte
+	GoSum     string
+	Signature []byte
+}</pre>
+        </section>
+
+</main>
+{{ end }}

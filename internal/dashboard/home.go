@@ -39,6 +39,6 @@ func ServeHome(w http.ResponseWriter, req *http.Request) {
 
 	ServePage(w, req,
 		"Source Spotter - Supply Chain Security for Go",
-		"Source Spotter is a sumdb auditor, toolchain reproducer, and telemetry config tracker.",
+		"Source Spotter is a sumdb auditor, module monitor, toolchain reproducer, and telemetry config tracker.",
 		homeTemplate, dashboard)
 }

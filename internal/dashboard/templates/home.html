@@ -12,6 +12,7 @@
 
 	<ul>
 		<li>A <a href="/sumdb/">sumdb auditor</a> - Source Spotter verifies that the Go Module Mirror and Checksum Database is behaving honestly, and has not presented inconsistent information to clients.</li>
+		<li>A <a href="/modules/">module monitor</a> - Source Spotter records every module version served by the Go Module Mirror and Checksum Database, allowing you to monitor for unexpected versions of your modules.</li>
 		<li>A <a href="/toolchain/">toolchain reproducer</a> - Source Spotter verifies that the Go toolchains published in the Go Module Mirror can be reproduced from source code, making it difficult to hide backdoors in the binaries downloaded by the go command.</li>
 		<li>A <a href="/telemetry/">telemetry config tracker</a> - Source Spotter tracks the names of telemetry counters uploaded by the Go toolchain, to ensure that Go telemetry is not violating users' privacy.</li>
 	</ul>
