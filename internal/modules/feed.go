@@ -1,4 +1,4 @@
-package monitor
+package modules
 
 import (
 	"crypto/ed25519"
@@ -74,7 +74,7 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 	}
 	defer rows.Close()
 
-	baseURL := "https://monitor.api." + sourcespotter.Domain + "/versions.atom"
+	baseURL := "https://feeds.api." + sourcespotter.Domain + "/modules/versions.atom"
 	u, _ := url.Parse(baseURL)
 	q := u.Query()
 	q.Set("module", module)

@@ -34,7 +34,6 @@ import (
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/modcheck"
 	"software.sslmate.com/src/sourcespotter/internal/modules"
-	"software.sslmate.com/src/sourcespotter/internal/monitor"
 	"software.sslmate.com/src/sourcespotter/internal/sths"
 	"software.sslmate.com/src/sourcespotter/internal/sumdb"
 	"software.sslmate.com/src/sourcespotter/internal/telemetry"
@@ -61,12 +60,12 @@ func newHTTPServer() *http.Server {
 	mux.HandleFunc("GET feeds.api."+domain+"/toolchain/toolchains.csv", toolchain.ServeToolchainsCSV)
 	mux.HandleFunc("GET feeds.api."+domain+"/telemetry/counters.atom", telemetry.ServeCountersAtom)
 	mux.HandleFunc("GET feeds.api."+domain+"/telemetry/counters.csv", telemetry.ServeCountersCSV)
+	mux.HandleFunc("GET feeds.api."+domain+"/modules/versions.atom", modules.ServeVersionsAtom)
 	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
-	// monitoring API
-	mux.HandleFunc("POST monitor.api."+domain+"/authorized", monitor.ReceiveAuthorized)
-	mux.HandleFunc("GET monitor.api."+domain+"/versions.atom", monitor.ServeVersionsAtom)
+	// modules API
+	mux.HandleFunc("POST modules.api."+domain+"/authorized", modules.ReceiveAuthorized)
 	// private API
 	mux.HandleFunc("GET private.api."+domain+"/modcheck", modcheck.Serve)
 

@@ -18,7 +18,7 @@
                 <h2>Atom Feed</h2>
 
                 <p>
-                        The feed is available at <code>https://monitor.api.{{ $.Domain }}/versions.atom</code>.
+                        The feed is available at <code>https://feeds.api.{{ $.Domain }}/modules/versions.atom</code>.
                         It returns up to 10,000 versions (excluding pre-release versions) ordered by the time we observed them.
                 </p>
 
@@ -42,7 +42,7 @@
 
                 <p>Enter the module path and optional Ed25519 public key to open the feed in a new tab.</p>
 
-                <form class="feed-form" action="https://monitor.api.{{ $.Domain }}/versions.atom" method="get" target="_blank">
+                <form class="feed-form" action="https://feeds.api.{{ $.Domain }}/modules/versions.atom" method="get" target="_blank">
                         <div>
                                 <label for="module">Module <span aria-hidden="true">*</span></label><br/>
                                 <input id="module" name="module" type="text" required placeholder="example.com/module"/>
@@ -71,7 +71,7 @@
 						To upload an authorization, POST the JSON serialization of the following Go struct
 						(containing an Ed25519 public key, a go.sum file, and an Ed25519 signature over
 						the go.sum file)
-                        to <code>https://monitor.api.{{ $.Domain }}/authorized</code>:
+                        to <code>https://modules.api.{{ $.Domain }}/authorized</code>:
                 </p>
 
 				<pre>struct {
