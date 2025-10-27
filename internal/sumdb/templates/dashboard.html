@@ -22,13 +22,8 @@
 		<code>curl --data-binary "@$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest" https://gossip.api.{{ $.Domain }}/sum.golang.org</code>
 	</p>
 	<p>
-		Source Spotter will reply with one of the following codes:
+		Source Spotter will audit the STH and reply with its assessment.
 	</p>
-	<ul>
-		<li><code>consistent</code> - your Go toolchain and Source Spotter have been given the same information by the Checksum Database</li>
-		<li><code>inconsistent</code> - your Go toolchain and Source Spotter have been given different information by the Checksum Database, suggesting that someone has been served a malicious module; the STH will be published on this page as evidence of the Checksum Database's misbehavior</li>
-		<li><code>pending</code> - we don't know yet if this STH is consistent with other STHs that we've seen; we will audit it ASAP and publish it on this page if it's inconsistent</li>
-	</ul>
 
 	<section>
 		<h2>Monitored Databases</h2>
@@ -120,6 +115,16 @@
 		<p>
 			<code>curl --data-binary "@$(go env GOPATH)/pkg/sumdb/sum.golang.org/latest" https://gossip.api.{{ $.Domain }}/sum.golang.org</code>
 		</p>
+
+		<p>
+			Source Spotter responds to an uploaded STH with a plain text document containing one of
+			the following status codes, followed by a colon, followed by a longer human-readable message:
+		</p>
+		<ul>
+			<li><code>consistent</code> - the uploaded STH is consistent with other STHs seen by Source Spotter</li>
+			<li><code>inconsistent</code> - the uploaded STH is inconsistent with other STHs seen by Source Spotter, meaning the Checksum Database has violated its integrity by presenting different information to different clients; the uploaded STH will be published on this page as evidence of the perfidy</li>
+			<li><code>pending</code> - Source Spotter doesn't know yet if the uploaded STH is consistent with other STHs seen by Source Spotter; it will be saved for future auditing and published on this page if it's inconsistent</li>
+		</ul>
 	</section>
 </main>
 {{ end }}
