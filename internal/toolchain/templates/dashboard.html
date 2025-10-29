@@ -22,7 +22,7 @@
 				<p>
 					The following toolchains have been reproduced from source:
 				</p>
-				<ul class="versionlist">
+				<ul class="versionlist" id="verified">
 						{{ range .Verified }}
 								<li>{{ . }}</li>
 						{{ end }}
@@ -35,7 +35,7 @@
 				<p>
 					The following toolchains failed to reproduce from source:
 				</p>
-				<table>
+				<table id="failures">
 						<thead>
 								<tr><th>Version</th><th>Status</th><th>Time (UTC)</th><th>Artifacts</th></tr>
 						</thead>
@@ -64,7 +64,7 @@
 				<p>
 					Source Spotter has used the following source tarballs:
 				</p>
-				<table>
+				<table id="sources">
 						<thead>
 								<tr><th>Version</th><th>SHA-256</th><th>Download Time (UTC)</th></tr>
 						</thead>
