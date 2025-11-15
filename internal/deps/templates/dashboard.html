@@ -1,0 +1,65 @@
+{{ define "content" }}
+<main>
+        <h1>Go Package Dependencies</h1>
+        <p>
+			Did you know that
+			when you import or install a Go package, the dependencies that are actually
+			downloaded and built may be a significantly smaller subset of the modules
+			listed in the go.mod file? This is because go.mod lists the dependencies of <em>every</em>
+			package in the module (including those you never use), for <em>every</em> possible build
+			configuration, including test-only dependencies.
+        </p>
+		<p>
+			This page uses the <code>go list -deps</code> command
+			to list the <strong>true dependencies</strong> of a Go package, to help you assess
+			the risk of using a third-party package.
+		</p>
+        <form class="deps-form" method="get" action="">
+                <label>
+                        Package:
+                        <input type="text" name="package" required value="{{ .Form.Package }}" placeholder="software.sslmate.com/src/sourcespotter"/>
+                </label>
+                <label>
+                        Platform:
+                        <select name="platform">
+                                {{ range .Platforms }}
+                                <option value="{{ . }}" {{ if eq $.Form.Platform . }}selected{{ end }}>{{ . }}</option>
+                                {{ end }}
+                        </select>
+                </label>
+                <label>
+                        Build tags (optional):
+                        <input type="text" name="tags" value="{{ .Form.Tags }}" placeholder="tag1,tag2"/>
+                </label>
+				<span>
+					<label>
+							<input type="checkbox" name="test" value="1" {{ if .Form.Test }}checked{{ end }}/>
+							Include test dependencies
+					</label>
+				</span>
+                <button type="submit">List dependencies</button>
+        </form>
+        {{ if .Error }}
+        <div class="deps-error">{{ .Error }}</div>
+        {{ end }}
+        {{ if .Results }}
+        <section>
+                <h2>Dependencies of {{ .Form.Package }}</h2>
+                <ul class="deps-module-list">
+                        {{ range .Results }}
+                        <li>
+                                <details>
+                                        <summary><code>{{ .Module }}</code> ({{ len .Packages }} packages)</summary>
+                                        <ul>
+                                                {{ range .Packages }}
+                                                <li><code>{{ . }}</code></li>
+                                                {{ end }}
+                                        </ul>
+                                </details>
+                        </li>
+                        {{ end }}
+                </ul>
+        </section>
+        {{ end }}
+</main>
+{{ end }}

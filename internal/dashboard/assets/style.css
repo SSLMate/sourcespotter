@@ -161,3 +161,67 @@ footer a {
         font-size: 1rem;
         cursor: pointer;
 }
+.deps-form {
+	display: grid;
+	gap: 0.75rem;
+	max-width: 36rem;
+	margin: 1.5rem 0;
+}
+.deps-form label {
+	font-weight: 600;
+}
+.deps-form > label {
+	display: flex;
+	flex-direction: column;
+	gap: 0.35rem;
+}
+.deps-form label input[type="text"],
+.deps-form label select {
+	font-weight: 400;
+}
+.deps-form input[type="text"],
+.deps-form select {
+	width: 100%;
+	box-sizing: border-box;
+	padding: 0.4rem;
+	font-size: 1rem;
+}
+.deps-form button {
+	width: fit-content;
+	padding: 0.6rem 1.5rem;
+	font-size: 1rem;
+	cursor: pointer;
+}
+.deps-error {
+	margin-top: 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid #c33;
+	background-color: #fbeaea;
+	color: #c33;
+	border-radius: 4px;
+	white-space: pre;
+	overflow-x: auto;
+}
+.deps-module-list {
+	list-style: none;
+	padding: 0;
+	margin: 0;
+	display: grid;
+	gap: 0.33rem;
+}
+.deps-module-list details > ul {
+	margin: 0.5rem 0 0.3rem 0;
+}
+.deps-module-list li {
+	line-height: 130%;
+}
+.deps-module-list li ul {
+	list-style: disc;
+}
+.deps-module-list code {
+	background: inherit;
+	border: none;
+	border-radius: 0;
+	padding: 0;
+	white-space: nowrap;
+}

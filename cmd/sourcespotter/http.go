@@ -32,6 +32,7 @@ import (
 
 	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
+	"software.sslmate.com/src/sourcespotter/internal/deps"
 	"software.sslmate.com/src/sourcespotter/internal/modcheck"
 	"software.sslmate.com/src/sourcespotter/internal/modules"
 	"software.sslmate.com/src/sourcespotter/internal/sths"
@@ -49,6 +50,7 @@ func newHTTPServer() *http.Server {
 	mux.Handle("GET "+domain+"/assets/", http.FileServerFS(dashboard.Assets))
 	mux.HandleFunc("GET "+domain+"/{$}", dashboard.ServeHome)
 	mux.HandleFunc("GET "+domain+"/modules/{$}", modules.ServeDashboard)
+	mux.HandleFunc("GET "+domain+"/deps/{$}", deps.ServeDashboard)
 	mux.HandleFunc("GET "+domain+"/sumdb/{$}", sumdb.ServeDashboard)
 	mux.HandleFunc("GET "+domain+"/toolchain/{$}", toolchain.ServeDashboard)
 	mux.HandleFunc("GET "+domain+"/telemetry/{$}", telemetry.ServeDashboard)

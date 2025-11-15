@@ -71,6 +71,7 @@ func main() {
 	}
 	var cfg struct {
 		Domain    string
+		GOPATH    string
 		Database  string
 		Listen    []string
 		Toolchain struct {
@@ -86,6 +87,7 @@ func main() {
 	}
 
 	sourcespotter.Domain = cfg.Domain
+	sourcespotter.GOPATH = cfg.GOPATH
 	sourcespotter.DBAddress = cfg.Database
 	if db, err := sql.Open("postgres", cfg.Database); err == nil {
 		sourcespotter.DB = db
