@@ -22,9 +22,9 @@ type versionInfo struct {
 	ExpectedGoModSum string
 	ObservedAt       time.Time
 	Download         struct {
-		Sum      string `json:",omitzero"`
-		GoModSum string `json:",omitzero"`
-		Error    string `json:",omitzero"`
+		Sum      string         `json:",omitzero"`
+		GoModSum string         `json:",omitzero"`
+		Error    string         `json:",omitzero"`
 		Origin   map[string]any `json:",omitzero"`
 	}
 }
@@ -56,7 +56,7 @@ func Serve(w http.ResponseWriter, req *http.Request) {
 	defer os.RemoveAll(gopath)
 
 	rc := http.NewResponseController(w)
-	rc.SetWriteDeadline(time.Now().Add(5*time.Minute))
+	rc.SetWriteDeadline(time.Now().Add(5 * time.Minute))
 
 	w.Header().Set("Content-Type", "application/jsonl")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
