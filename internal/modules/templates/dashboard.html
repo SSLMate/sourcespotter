@@ -69,15 +69,13 @@
 
 				<p>
 						To upload an authorization, POST the JSON serialization of the following Go struct
-						(containing an Ed25519 public key, a go.sum file, and an Ed25519 signature over
-						the go.sum file)
                         to <code>https://v1.api.{{ $.Domain }}/modules/authorized</code>:
                 </p>
 
 				<pre>struct {
-	Ed25519   []byte
-	GoSum     string
-	Signature []byte
+	Ed25519   []byte // Public key used to verify Signature
+	GoSum     string // A go.sum file listing authorized module versions
+	Signature []byte // Ed25519 signature over GoSum
 }</pre>
         </section>
 
