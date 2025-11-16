@@ -63,7 +63,7 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 	listArgs = packagePaths(listArgs, packages)
 
 	var stdout, stderr bytes.Buffer
-	cmd := goCommand(ctx, tempDir, listArgs...)
+	cmd := goCommand(ctx, tempDir, "go", listArgs...)
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
 	cmd.Env = append(cmd.Env,

@@ -40,7 +40,7 @@ func getModfetch(w http.ResponseWriter, req *http.Request) error {
 		http.Error(w, "module does not contain @", 400)
 		return nil
 	}
-	cmd := goCommand(ctx, "/", "mod", "download", "-json", "--", module)
+	cmd := goCommand(ctx, "/", "go", "mod", "download", "-json", "--", module)
 	cmd.Env = append(cmd.Env,
 		"GOPROXY=direct",
 		"GOSUMDB=off",

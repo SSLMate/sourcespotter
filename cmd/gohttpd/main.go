@@ -100,8 +100,8 @@ func handler(h handlerFunc) http.HandlerFunc {
 	}
 }
 
-func goCommand(ctx context.Context, dir string, arg ...string) *exec.Cmd {
-	cmd := exec.CommandContext(ctx, "go", arg...)
+func goCommand(ctx context.Context, dir string, name string, arg ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, name, arg...)
 	cmd.Env = []string{
 		"CGO_ENABLED=0",
 		// -modcacherw for easier GOPATH management, -buildvcs=false to prevent arbitrary code execution via VCS
@@ -129,7 +129,7 @@ func tempModule(ctx context.Context, packages ...string) (moduleDir string, err 
 			os.RemoveAll(tempDir)
 		}
 	}()
-	if out, err := goCommand(ctx, tempDir, "mod", "init", "tmp").CombinedOutput(); err != nil {
+	if out, err := goCommand(ctx, tempDir, "go", "mod", "init", "tmp").CombinedOutput(); err != nil {
 		if len(out) != 0 {
 			return "", fmt.Errorf("error initializing temporary module: %s", bytes.TrimSpace(out))
 		}
@@ -137,7 +137,7 @@ func tempModule(ctx context.Context, packages ...string) (moduleDir string, err 
 	}
 	if len(packages) > 0 {
 		getArgs := append([]string{"get", "--"}, packages...)
-		if out, err := goCommand(ctx, tempDir, getArgs...).CombinedOutput(); err != nil {
+		if out, err := goCommand(ctx, tempDir, "go", getArgs...).CombinedOutput(); err != nil {
 			if len(out) != 0 {
 				return "", errors.New(string(bytes.TrimSpace(out)))
 			}
