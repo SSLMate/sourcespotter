@@ -82,7 +82,7 @@ func Serve(w http.ResponseWriter, req *http.Request) {
 				ExpectedGoModSum: "h1:" + base64.StdEncoding.EncodeToString(record.GomodSHA256),
 				ObservedAt:       record.ObservedAt,
 			}
-			cmd := exec.CommandContext(ctx, "go", "mod", "download", "-modcacherw", "-json", module+"@"+record.Version)
+			cmd := exec.CommandContext(ctx, "go", "mod", "download", "-modcacherw", "-json", "--", module+"@"+record.Version)
 			cmd.Env = []string{
 				"HOME=" + os.Getenv("HOME"),
 				"USER=" + os.Getenv("USER"),
