@@ -27,13 +27,17 @@
 package main
 
 import (
+	"bytes"
 	"cmp"
 	"context"
+	"errors"
 	"flag"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"src.agwa.name/go-listener"
@@ -113,4 +117,40 @@ func goCommand(ctx context.Context, dir string, arg ...string) *exec.Cmd {
 	}
 	cmd.Dir = dir
 	return cmd
+}
+
+func tempModule(ctx context.Context, packages ...string) (moduleDir string, err error) {
+	tempDir, err := os.MkdirTemp("", "gohttpd-tmp-")
+	if err != nil {
+		return "", fmt.Errorf("failed to create temporary directory: %w", err)
+	}
+	defer func() {
+		if err != nil {
+			os.RemoveAll(tempDir)
+		}
+	}()
+	if out, err := goCommand(ctx, tempDir, "mod", "init", "tmp").CombinedOutput(); err != nil {
+		if len(out) != 0 {
+			return "", fmt.Errorf("error initializing temporary module: %s", bytes.TrimSpace(out))
+		}
+		return "", fmt.Errorf("error executing 'go mod init': %w", err)
+	}
+	if len(packages) > 0 {
+		getArgs := append([]string{"get", "--"}, packages...)
+		if out, err := goCommand(ctx, tempDir, getArgs...).CombinedOutput(); err != nil {
+			if len(out) != 0 {
+				return "", errors.New(string(bytes.TrimSpace(out)))
+			}
+			return "", fmt.Errorf("error executing 'go get': %w", err)
+		}
+	}
+	return tempDir, nil
+}
+
+func packagePaths(paths []string, packages []string) []string {
+	for _, pkg := range packages {
+		path, _, _ := strings.Cut(pkg, "@")
+		paths = append(paths, path)
+	}
+	return paths
 }

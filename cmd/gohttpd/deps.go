@@ -46,25 +46,12 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 		test     = q.Get("test") == "1"
 	)
 
-	tempDir, err := os.MkdirTemp("", "sourcespotter-deps-")
+	tempDir, err := tempModule(ctx, packages...)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary directory: %w", err)
 	}
 	defer os.RemoveAll(tempDir)
 
-	if out, err := goCommand(ctx, tempDir, "mod", "init", "tmp").CombinedOutput(); err != nil {
-		if len(out) != 0 {
-			return fmt.Errorf("error initializing temporary module: %s", bytes.TrimSpace(out))
-		}
-		return fmt.Errorf("error executing 'go mod init': %w", err)
-	}
-	getArgs := append([]string{"get", "--"}, packages...)
-	if out, err := goCommand(ctx, tempDir, getArgs...).CombinedOutput(); err != nil {
-		if len(out) != 0 {
-			return errors.New(string(bytes.TrimSpace(out)))
-		}
-		return fmt.Errorf("error executing 'go get': %w", err)
-	}
 	listArgs := []string{"list", "-deps", "-f", "{{if .Module}}{{.Module.Path}}@{{.Module.Version}} {{.ImportPath}}{{end}}"}
 	if test {
 		listArgs = append(listArgs, "-test")
@@ -73,10 +60,7 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 		listArgs = append(listArgs, "-tags", strings.Join(tags, ","))
 	}
 	listArgs = append(listArgs, "--")
-	for _, pkg := range packages {
-		path, _, _ := strings.Cut(pkg, "@")
-		listArgs = append(listArgs, path)
-	}
+	listArgs = packagePaths(listArgs, packages)
 
 	var stdout, stderr bytes.Buffer
 	cmd := goCommand(ctx, tempDir, listArgs...)
