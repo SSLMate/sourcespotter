@@ -28,14 +28,17 @@ package main
 import (
 	"bytes"
 	"cmp"
+	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"strings"
 )
 
 func getVulncheck(w http.ResponseWriter, req *http.Request) error {
+	rc := http.NewResponseController(w)
 	ctx := req.Context()
 	q := req.URL.Query()
 	var (
@@ -67,15 +70,15 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 	args = append(args, "--")
 	args = packagePaths(args, packages)
 
-	var stdout, stderr bytes.Buffer
 	cmd := goCommand(ctx, tempDir, "govulncheck", args...)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
 	cmd.Env = append(cmd.Env,
 		"GOOS="+goos,
 		"GOARCH="+goarch,
 	)
 	if format == "text" {
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 		if err := cmd.Run(); err == nil {
 			// no vulnerabilities found
 			w.WriteHeader(http.StatusNoContent)
@@ -89,7 +92,10 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 		} else {
 			return fmt.Errorf("error executing govulncheck: %w", err)
 		}
-	} else {
+	} else if format == "sarif" || format == "openvex" {
+		var stdout, stderr bytes.Buffer
+		cmd.Stdout = &stdout
+		cmd.Stderr = &stderr
 		if err := cmd.Run(); err == nil {
 			// always exists successfully even if vulnerabilities were found
 			w.Header().Set("Content-Type", "application/json")
@@ -100,6 +106,55 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 		} else {
 			return fmt.Errorf("error executing govulncheck: %w", err)
 		}
+	} else if format == "json" {
+		var stderr bytes.Buffer
+		cmd.Stderr = &stderr
+		stdout, err := cmd.StdoutPipe()
+		if err != nil {
+			return err
+		}
+		if err := cmd.Start(); err != nil {
+			return fmt.Errorf("error executing govulncheck: %w", err)
+		}
+		buf := new(bytes.Buffer)
+		dec := json.NewDecoder(stdout)
+		dec.UseNumber()
+		wroteHeader := false
+		for dec.More() {
+			var item json.RawMessage
+			if err := dec.Decode(&item); err != nil {
+				log.Printf("received invalid JSON from govulncheck: %s", err)
+				break
+			}
+			if err := json.Compact(buf, item); err != nil {
+				log.Printf("error compacting JSON from govulncheck: %s", err)
+				break
+			}
+			if !wroteHeader {
+				w.Header().Set("Content-Type", "application/jsonl")
+				w.Header().Set("X-Content-Type-Options", "nosniff")
+				w.WriteHeader(http.StatusOK)
+				wroteHeader = true
+			}
+			io.Copy(w, buf)
+			w.Write([]byte{'\n'})
+			rc.Flush()
+			buf.Reset()
+		}
+		io.Copy(io.Discard, stdout)
+		if err := cmd.Wait(); err != nil {
+			if stderr.Len() > 0 {
+				err = fmt.Errorf("error from govulncheck: %s", strings.TrimSpace(stderr.String()))
+			}
+			if !wroteHeader {
+				return err
+			}
+			if ctx.Err() == nil {
+				log.Printf("govulncheck failed after it started streaming JSON: %s", err)
+			}
+		}
+	} else {
+		return fmt.Errorf("unknown format %q", format)
 	}
 	return nil
 }
