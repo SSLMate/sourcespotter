@@ -72,6 +72,7 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /deps", handler(getDeps))
 	mux.HandleFunc("GET /modfetch", handler(getModfetch))
+	mux.HandleFunc("GET /vulncheck", handler(getVulncheck))
 
 	server := &http.Server{
 		ReadTimeout:  5 * time.Second,
