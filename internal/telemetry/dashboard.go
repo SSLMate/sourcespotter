@@ -2,7 +2,6 @@ package telemetry
 
 import (
 	"context"
-	"embed"
 	"log"
 	"net/http"
 	"time"
@@ -11,11 +10,6 @@ import (
 	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"src.agwa.name/go-dbutil"
 )
-
-//go:embed templates/*
-var templates embed.FS
-
-var dashboardTemplate = basedashboard.ParseTemplate(templates, "templates/dashboard.html")
 
 type counterRow struct {
 	Program string `sql:"program"`
@@ -56,5 +50,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	basedashboard.ServePage(w, req,
 		"Telemetry Counters - Source Spotter",
 		"Source Spotter tracks Go telemetry counters to ensure they respect users' privacy.",
-		dashboardTemplate, dash)
+		"telemetry.html", dash)
 }

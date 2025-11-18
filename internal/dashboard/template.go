@@ -26,30 +26,14 @@
 package dashboard
 
 import (
-	"embed"
 	"html/template"
-	"io/fs"
 	"net/http"
 	"runtime/debug"
 
 	"software.sslmate.com/src/sourcespotter"
 )
 
-//go:embed assets/*
-var Assets embed.FS
-
-//go:embed templates/*
-var templates embed.FS
-
 var templateFuncs = template.FuncMap{}
-
-var baseTemplate = template.Must(template.New("base.html").Funcs(templateFuncs).ParseFS(templates, "templates/base.html"))
-
-var homeTemplate = ParseTemplate(templates, "templates/home.html")
-
-func ParseTemplate(fs fs.FS, patterns ...string) *template.Template {
-	return template.Must(template.Must(baseTemplate.Clone()).ParseFS(fs, patterns...))
-}
 
 type templateData struct {
 	Domain      string
@@ -60,7 +44,8 @@ type templateData struct {
 	Body        any
 }
 
-func ServePage(w http.ResponseWriter, req *http.Request, title, description string, tmpl *template.Template, body any) {
+func ServePage(w http.ResponseWriter, req *http.Request, title, description string, templateFilename string, body any) {
+	tmpl := GetTemplate(templateFilename)
 	data := &templateData{
 		Domain:      sourcespotter.Domain,
 		Request:     req,

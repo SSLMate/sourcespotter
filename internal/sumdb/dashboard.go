@@ -27,7 +27,6 @@ package sumdb
 
 import (
 	"context"
-	"embed"
 	"encoding/base64"
 	"html/template"
 	"log"
@@ -40,11 +39,6 @@ import (
 	"software.sslmate.com/src/sourcespotter/sumdb"
 	"src.agwa.name/go-dbutil"
 )
-
-//go:embed templates/*
-var templates embed.FS
-
-var dashboardTemplate = basedashboard.ParseTemplate(templates, "templates/dashboard.html")
 
 type SumDB struct {
 	Address        string
@@ -171,5 +165,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	basedashboard.ServePage(w, req,
 		"Go Checksum Database Auditor - Source Spotter",
 		"Source Spotter verifies the consistency of the Go Checksum Database.",
-		dashboardTemplate, dashboard)
+		"sumdb.html", dashboard)
 }

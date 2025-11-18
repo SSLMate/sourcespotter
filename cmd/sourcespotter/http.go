@@ -47,7 +47,7 @@ func newHTTPServer() *http.Server {
 
 	mux := http.NewServeMux()
 	// web dashboard
-	mux.Handle("GET "+domain+"/assets/", http.FileServerFS(dashboard.Assets))
+	mux.HandleFunc("GET "+domain+"/assets/", dashboard.ServeAssets)
 	mux.HandleFunc("GET "+domain+"/{$}", dashboard.ServeHome)
 	mux.HandleFunc("GET "+domain+"/modules/{$}", modules.ServeDashboard)
 	mux.HandleFunc("GET "+domain+"/deps/{$}", deps.ServeDashboard)

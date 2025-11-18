@@ -26,19 +26,21 @@
 package dashboard
 
 import (
+	"embed"
+	"html/template"
+	"io/fs"
 	"net/http"
-
-	"software.sslmate.com/src/sourcespotter"
 )
 
-func ServeHome(w http.ResponseWriter, req *http.Request) {
-	var dashboard struct {
-		Domain string
-	}
-	dashboard.Domain = sourcespotter.Domain
+//go:embed assets/* templates/*
+var embedFiles embed.FS
 
-	ServePage(w, req,
-		"Source Spotter - Supply Chain Security for Go",
-		"Source Spotter is a sumdb auditor, module monitor, toolchain reproducer, and telemetry config tracker.",
-		"home.html", dashboard)
+var Files fs.FS = embedFiles
+
+func GetTemplate(filename string) *template.Template {
+	return template.Must(template.ParseFS(Files, "templates/base.html", "templates/"+filename)).Funcs(templateFuncs)
+}
+
+func ServeAssets(w http.ResponseWriter, r *http.Request) {
+	http.FileServerFS(Files).ServeHTTP(w, r)
 }

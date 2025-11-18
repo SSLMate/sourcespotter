@@ -38,6 +38,7 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/config"
 	"software.sslmate.com/src/sourcespotter"
+	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/toolchain"
 	"src.agwa.name/go-listener"
 	_ "src.agwa.name/go-listener/tls"
@@ -46,12 +47,14 @@ import (
 func main() {
 	var flags struct {
 		config    string
+		files     string
 		sumdb     bool
 		toolchain bool
 		telemetry bool
 		listen    []string
 	}
 	flag.StringVar(&flags.config, "config", "", "Path to configuration file")
+	flag.StringVar(&flags.files, "files", "", "Path to templates and assets to override embedded copies")
 	flag.BoolVar(&flags.sumdb, "sumdb", false, "Enable sumdb monitoring")
 	flag.BoolVar(&flags.toolchain, "toolchain", false, "Enable toolchain auditing")
 	flag.BoolVar(&flags.telemetry, "telemetry", false, "Enable telemetry config monitoring")
@@ -95,6 +98,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer sourcespotter.DB.Close()
+
+	if flags.files != "" {
+		dashboard.Files = os.DirFS(flags.files)
+	}
 
 	if awsCfg, err := config.LoadDefaultConfig(context.Background()); err == nil {
 		toolchain.AWSConfig = awsCfg

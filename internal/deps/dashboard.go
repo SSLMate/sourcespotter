@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"bytes"
 	"context"
-	"embed"
 	"errors"
 	"fmt"
 	"maps"
@@ -18,11 +17,6 @@ import (
 	"software.sslmate.com/src/sourcespotter"
 	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
 )
-
-//go:embed templates/*
-var templates embed.FS
-
-var dashboardTemplate = basedashboard.ParseTemplate(templates, "templates/dashboard.html")
 
 var platforms = []string{
 	"aix/ppc64",
@@ -115,7 +109,7 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	basedashboard.ServePage(w, req,
 		"Go Package Dependencies - Source Spotter",
 		"List the dependencies of a Go package, properly.",
-		dashboardTemplate, data)
+		"deps.html", data)
 }
 
 func parseForm(req *http.Request) formData {

@@ -27,7 +27,6 @@ package toolchain
 
 import (
 	"context"
-	"embed"
 	"encoding/hex"
 	"fmt"
 	"log"
@@ -41,11 +40,6 @@ import (
 	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"src.agwa.name/go-dbutil"
 )
-
-//go:embed templates/*
-var templates embed.FS
-
-var dashboardTemplate = basedashboard.ParseTemplate(templates, "templates/dashboard.html")
 
 type failureRow struct {
 	Version    string    `sql:"version"`
@@ -142,5 +136,5 @@ func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	basedashboard.ServePage(w, req,
 		"Go Toolchain Reproducibility - Source Spotter",
 		"Source Spotter reproduces Go toolchains to detect tampering in distributed binaries.",
-		dashboardTemplate, dash)
+		"toolchain.html", dash)
 }
