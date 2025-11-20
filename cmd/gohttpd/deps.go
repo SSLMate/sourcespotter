@@ -42,7 +42,7 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 		packages = q["package"]
 		goos     = q.Get("goos")
 		goarch   = q.Get("goarch")
-		tags     = q["tag"]
+		tags     = q.Get("tags")
 		test     = q.Get("test") == "1"
 	)
 
@@ -57,7 +57,7 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 		listArgs = append(listArgs, "-test")
 	}
 	if len(tags) != 0 {
-		listArgs = append(listArgs, "-tags", strings.Join(tags, ","))
+		listArgs = append(listArgs, "-tags", tags)
 	}
 	listArgs = append(listArgs, "--")
 	listArgs = packagePaths(listArgs, packages)

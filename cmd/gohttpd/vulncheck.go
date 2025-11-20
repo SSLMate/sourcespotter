@@ -45,7 +45,7 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 		packages = q["package"]
 		goos     = q.Get("goos")
 		goarch   = q.Get("goarch")
-		tags     = q["tag"]
+		tags     = q.Get("tags")
 		show     = q["show"]
 		test     = q.Get("test") == "1"
 		format   = cmp.Or(q.Get("format"), "text")
@@ -62,7 +62,7 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 		args = append(args, "-test")
 	}
 	if len(tags) != 0 {
-		args = append(args, "-tags", strings.Join(tags, ","))
+		args = append(args, "-tags", tags)
 	}
 	if len(show) != 0 {
 		args = append(args, "-show", strings.Join(show, ","))
