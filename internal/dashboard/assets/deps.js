@@ -75,20 +75,26 @@
 
 			// Parse lines: MODULE PACKAGE
 			const moduleMap = new Map();
+			let mainModule = '';
 			const lines = text.split(/\r?\n/);
 
 			for (const line of lines) {
 				const trimmed = line.trim();
 				if (!trimmed) continue;
 
-				const [module, pkg] = trimmed.split(/\s+/, 2);
+				const [depOnly, module, pkg] = trimmed.split(/\s+/, 3);
 				if (!module || !pkg) continue;
 
 				if (!moduleMap.has(module)) {
 					moduleMap.set(module, []);
 				}
 				moduleMap.get(module).push(pkg);
+
+				if (depOnly === 'false') {
+					mainModule = module;
+				}
 			}
+			moduleMap.delete(mainModule);
 
 			// Build DOM for results
 			results.innerHTML = '';
