@@ -43,13 +43,13 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 	q := req.URL.Query()
 	var (
 		packages = q["package"]
-		goos     = q.Get("goos")
-		goarch   = q.Get("goarch")
+		target   = q.Get("target")
 		tags     = q.Get("tags")
 		show     = q["show"]
 		test     = q.Get("test") == "1"
 		format   = cmp.Or(q.Get("format"), "text")
 	)
+	goos, goarch, _ := strings.Cut(target, "/")
 
 	tempDir, err := tempModule(ctx, test, packages...)
 	if err != nil {

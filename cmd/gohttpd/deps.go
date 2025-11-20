@@ -40,11 +40,11 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 	q := req.URL.Query()
 	var (
 		packages = q["package"]
-		goos     = q.Get("goos")
-		goarch   = q.Get("goarch")
+		target   = q.Get("target")
 		tags     = q.Get("tags")
 		test     = q.Get("test") == "1"
 	)
+	goos, goarch, _ := strings.Cut(target, "/")
 
 	tempDir, err := tempModule(ctx, test, packages...)
 	if err != nil {
