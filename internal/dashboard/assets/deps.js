@@ -99,7 +99,8 @@
 			const resultsUL = document.createElement('ul');
 			results.appendChild(resultsUL);
 
-			for (const [module, packages] of moduleMap.entries()) {
+			for (const module of [...moduleMap.keys()].sort()) {
+				const packages = moduleMap.get(module);
 				const li = document.createElement('li');
 
 				const details = document.createElement('details');
@@ -117,7 +118,7 @@
 				details.appendChild(summary);
 
 				const ul = document.createElement('ul');
-				for (const p of packages) {
+				for (const p of packages.sort()) {
 					const pkgLi = document.createElement('li');
 					const codePkg = document.createElement('code');
 					codePkg.textContent = p;
