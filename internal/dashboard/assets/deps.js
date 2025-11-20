@@ -12,12 +12,12 @@
 	}
 	function setFormData(formData) {
 		form['package'].value = formData.get('package') ?? '';
-		form['platform'].value = formData.get('platform') ?? 'linux/amd64';
+		form['target'].value = formData.get('target') ?? 'linux/amd64';
 		form['tags'].value = formData.get('tags') ?? '';
 		form['test'].checked = formData.get('test') === '1';
 
 		configDetails.open =
-			form['platform'].value !== 'linux/amd64' ||
+			form['target'].value !== 'linux/amd64' ||
 			form['tags'].value !== '' ||
 			form['test'].checked;
 	}

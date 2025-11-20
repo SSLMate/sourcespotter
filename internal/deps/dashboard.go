@@ -7,7 +7,7 @@ import (
 	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
 )
 
-var platforms = []string{
+var targets = []string{
 	"aix/ppc64",
 	"android/386",
 	"android/amd64",
@@ -59,14 +59,14 @@ var platforms = []string{
 }
 
 type dashboardData struct {
-	Domain    string
-	Platforms []string
+	Domain  string
+	Targets []string
 }
 
 func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	data := &dashboardData{
-		Domain:    sourcespotter.Domain,
-		Platforms: platforms,
+		Domain:  sourcespotter.Domain,
+		Targets: targets,
 	}
 
 	basedashboard.ServePage(w, req,
