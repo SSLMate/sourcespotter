@@ -117,8 +117,14 @@
 					const details = document.createElement('details');
 					const summary = document.createElement('summary');
 
+					const aModule = document.createElement('a');
+					aModule.href = 'https://go-mod-viewer.appspot.com/' + module;
+					aModule.addEventListener('click', function(e) {
+						e.stopPropagation();
+					});
+					aModule.textContent = module;
 					const codeModule = document.createElement('code');
-					codeModule.textContent = module;
+					codeModule.appendChild(aModule);
 
 					const textNode = document.createTextNode(
 						` (${packages.length} package${packages.length === 1 ? '' : 's'})`
