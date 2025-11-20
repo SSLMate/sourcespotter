@@ -246,10 +246,13 @@ footer a {
 	color: #000;
 	border-radius: 4px;
 }
+.deps-results > h2 {
+	margin: 0;
+}
 .deps-results > ul {
 	list-style: none;
 	padding: 0;
-	margin: 0;
+	margin: 1rem 0 0 0;
 	display: grid;
 	gap: 0.33rem;
 }

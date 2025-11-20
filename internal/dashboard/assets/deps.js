@@ -99,42 +99,48 @@
 			// Build DOM for results
 			results.innerHTML = '';
 			const h2 = document.createElement('h2');
-			h2.textContent = `${moduleMap.size} module${moduleMap.size===1?'':'s'}`;
+			if (moduleMap.size===0) {
+				h2.textContent = `${mainModule} has no dependencies`;
+			} else {
+				h2.textContent = `${mainModule} depends on ${moduleMap.size} module${moduleMap.size===1?'':'s'}:`;
+			}
 			results.appendChild(h2);
 
-			const resultsUL = document.createElement('ul');
-			results.appendChild(resultsUL);
+			if (moduleMap.size > 0) {
+				const resultsUL = document.createElement('ul');
+				results.appendChild(resultsUL);
 
-			for (const module of [...moduleMap.keys()].sort()) {
-				const packages = moduleMap.get(module);
-				const li = document.createElement('li');
+				for (const module of [...moduleMap.keys()].sort()) {
+					const packages = moduleMap.get(module);
+					const li = document.createElement('li');
 
-				const details = document.createElement('details');
-				const summary = document.createElement('summary');
+					const details = document.createElement('details');
+					const summary = document.createElement('summary');
 
-				const codeModule = document.createElement('code');
-				codeModule.textContent = module;
+					const codeModule = document.createElement('code');
+					codeModule.textContent = module;
 
-				const textNode = document.createTextNode(
-					` (${packages.length} package${packages.length === 1 ? '' : 's'})`
-				);
+					const textNode = document.createTextNode(
+						` (${packages.length} package${packages.length === 1 ? '' : 's'})`
+					);
 
-				summary.appendChild(codeModule);
-				summary.appendChild(textNode);
-				details.appendChild(summary);
+					summary.appendChild(codeModule);
+					summary.appendChild(textNode);
+					details.appendChild(summary);
 
-				const ul = document.createElement('ul');
-				for (const p of packages.sort()) {
-					const pkgLi = document.createElement('li');
-					const codePkg = document.createElement('code');
-					codePkg.textContent = p;
-					pkgLi.appendChild(codePkg);
-					ul.appendChild(pkgLi);
+					const ul = document.createElement('ul');
+					for (const p of packages.sort()) {
+						const pkgLi = document.createElement('li');
+						const codePkg = document.createElement('code');
+						codePkg.textContent = p;
+						pkgLi.appendChild(codePkg);
+						ul.appendChild(pkgLi);
+					}
+
+					details.appendChild(ul);
+					li.appendChild(details);
+					resultsUL.appendChild(li);
 				}
-
-				details.appendChild(ul);
-				li.appendChild(details);
-				resultsUL.appendChild(li);
 			}
 
 			errors.hidden = true;
