@@ -51,7 +51,7 @@ func getVulncheck(w http.ResponseWriter, req *http.Request) error {
 		format   = cmp.Or(q.Get("format"), "text")
 	)
 
-	tempDir, err := tempModule(ctx, packages...)
+	tempDir, err := tempModule(ctx, test, packages...)
 	if err != nil {
 		return fmt.Errorf("failed to create temporary directory: %w", err)
 	}

@@ -120,7 +120,7 @@ func goCommand(ctx context.Context, dir string, name string, arg ...string) *exe
 	return cmd
 }
 
-func tempModule(ctx context.Context, packages ...string) (moduleDir string, err error) {
+func tempModule(ctx context.Context, test bool, packages ...string) (moduleDir string, err error) {
 	tempDir, err := os.MkdirTemp("", "gohttpd-tmp-")
 	if err != nil {
 		return "", fmt.Errorf("failed to create temporary directory: %w", err)
@@ -137,8 +137,13 @@ func tempModule(ctx context.Context, packages ...string) (moduleDir string, err 
 		return "", fmt.Errorf("error executing 'go mod init': %w", err)
 	}
 	if len(packages) > 0 {
-		getArgs := append([]string{"get", "--"}, packages...)
-		if out, err := goCommand(ctx, tempDir, "go", getArgs...).CombinedOutput(); err != nil {
+		args := []string{"get"}
+		if test {
+			args = append(args, "-t")
+		}
+		args = append(args, "--")
+		args = append(args, packages...)
+		if out, err := goCommand(ctx, tempDir, "go", args...).CombinedOutput(); err != nil {
 			if len(out) != 0 {
 				return "", errors.New(string(bytes.TrimSpace(out)))
 			}
