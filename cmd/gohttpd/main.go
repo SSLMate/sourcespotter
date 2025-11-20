@@ -94,6 +94,7 @@ type handlerFunc = func(http.ResponseWriter, *http.Request) error
 
 func handler(h handlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
 		err := h(w, r)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
