@@ -1,65 +1,53 @@
 {{ define "content" }}
-<main>
-        <h1>Go Package Dependencies</h1>
-        <p>
+<main class="deps">
+	<h1>Go Package Dependencies</h1>
+	<div id="deps-intro">
+		<p>
 			Did you know that
 			when you import or install a Go package, the dependencies that are actually
 			downloaded and built may be a significantly smaller subset of the modules
 			listed in the go.mod file? This is because go.mod lists the dependencies of <em>every</em>
 			package in the module (including packages you never use), for <em>every</em> possible build
 			configuration, including test-only dependencies.
-        </p>
+		</p>
 		<p>
 			This page uses the <code>go list -deps</code> command
 			to list the <strong>true dependencies</strong> of a Go package, to help you assess
 			the risk of using a third-party package.
 		</p>
-        <form class="deps-form" method="get" action="">
-                <label>
-                        Package:
-                        <input type="text" name="package" required value="{{ .Form.Package }}" placeholder="software.sslmate.com/src/sourcespotter"/>
-                </label>
-                <label>
-                        Platform:
-                        <select name="platform">
-                                {{ range .Platforms }}
-                                <option value="{{ . }}" {{ if eq $.Form.Platform . }}selected{{ end }}>{{ . }}</option>
-                                {{ end }}
-                        </select>
-                </label>
-                <label>
-                        Build tags (optional):
-                        <input type="text" name="tags" value="{{ .Form.Tags }}" placeholder="tag1,tag2"/>
-                </label>
-				<span>
-					<label>
-							<input type="checkbox" name="test" value="1" {{ if .Form.Test }}checked{{ end }}/>
-							Include test dependencies
-					</label>
-				</span>
-                <button type="submit">List dependencies</button>
-        </form>
-        {{ if .Error }}
-        <div class="deps-error">{{ .Error }}</div>
-        {{ end }}
-        {{ if .Results }}
-        <section>
-                <h2>Dependencies of {{ .Form.Package }}</h2>
-                <ul class="deps-module-list">
-                        {{ range .Results }}
-                        <li>
-                                <details>
-                                        <summary><code>{{ .Module }}</code> ({{ len .Packages }} packages)</summary>
-                                        <ul>
-                                                {{ range .Packages }}
-                                                <li><code>{{ . }}</code></li>
-                                                {{ end }}
-                                        </ul>
-                                </details>
-                        </li>
-                        {{ end }}
-                </ul>
-        </section>
-        {{ end }}
+	</div>
+	<form class="deps-form" id="deps-form" method="get" action="https://go.api.{{$.Domain}}/deps">
+		<details class="deps-config" id="deps-config">
+			<summary>Build Configuration</summary>
+
+			<div>
+				<label>
+						Target:
+						<select name="platform">
+								{{ range .Platforms }}
+								<option value="{{ . }}">{{ . }}</option>
+								{{ end }}
+						</select>
+				</label>
+				<label>
+						Build tags:
+						<input type="text" name="tags" placeholder="tag1,tag2"/>
+				</label>
+				<label>
+						<input type="checkbox" name="test" value="1"/>
+						Include test dependencies
+				</label>
+			</div>
+		</details>
+		<p class="deps-package">
+			<label for="deps-packageinput">Package:</label>
+			<input autofocus id="deps-packageinput" type="text" name="package" required placeholder="software.sslmate.com/src/sourcespotter"/>
+			<button type="submit">Show dependencies</button>
+		</p>
+	</form>
+	<div class="deps-error" id="deps-errors" hidden></div>
+	<div class="deps-results" id="deps-results" hidden></div>
+	<div id="deps-progress" hidden><div class="spinner"></div></div>
+	<script src="/assets/deps.js"></script>
 </main>
 {{ end }}
