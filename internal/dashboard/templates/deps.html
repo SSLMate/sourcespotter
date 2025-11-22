@@ -18,7 +18,7 @@
 	</div>
 	<form class="deps-form" id="deps-form" method="get" action="https://go.api.{{$.Domain}}/deps">
 		<details class="deps-config" id="deps-config">
-			<summary>Build Configuration</summary>
+			<summary>Options</summary>
 
 			<div>
 				<label>
@@ -37,6 +37,13 @@
 						<input type="checkbox" name="test" value="1"/>
 						Include test dependencies
 				</label>
+				<label>
+						First party:
+						<input type="text" name="firstparty" placeholder="github.com/you" aria-describedby="deps-firstparty-instructions"/>
+				</label>
+				<p id="deps-firstparty-instructions" class="deps-instructions">
+					Modules beneath this path are labeled first party dependencies.
+				</p>
 			</div>
 		</details>
 		<p class="deps-package">

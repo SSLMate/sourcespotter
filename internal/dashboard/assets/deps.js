@@ -14,6 +14,7 @@
 		form['package'].value = formData.get('package') ?? '';
 		form['target'].value = formData.get('target') ?? 'linux/amd64';
 		form['tags'].value = formData.get('tags') ?? '';
+		form['firstparty'].value = formData.get('firstparty') ?? '';
 		form['test'].checked = formData.get('test') === '1';
 
 		configDetails.open =
@@ -41,6 +42,11 @@
 		if (currentController) {
 			currentController.abort();
 			currentController = null;
+		}
+
+		let firstPartyWithSlash = formData.get('firstparty');
+		if (firstPartyWithSlash && !firstPartyWithSlash.endsWith('/')) {
+			firstPartyWithSlash += '/';
 		}
 
 		const pkg = formData.get('package') ?? '';
@@ -127,11 +133,22 @@
 					codeModule.appendChild(aModule);
 
 					const textNode = document.createTextNode(
-						` (${packages.length} package${packages.length === 1 ? '' : 's'})`
+						` (${packages.length} package${packages.length === 1 ? '' : 's'}) `
 					);
 
 					summary.appendChild(codeModule);
 					summary.appendChild(textNode);
+					if (module.startsWith("golang.org/")) {
+						const badge = document.createElement('span');
+						badge.className = 'deps-badge deps-badge-go';
+						badge.textContent = 'Go';
+						summary.appendChild(badge);
+					} else if (firstPartyWithSlash && module.startsWith(firstPartyWithSlash)) {
+						const badge = document.createElement('span');
+						badge.className = 'deps-badge deps-badge-firstparty';
+						badge.textContent = 'First Party';
+						summary.appendChild(badge);
+					}
 					details.appendChild(summary);
 
 					const ul = document.createElement('ul');

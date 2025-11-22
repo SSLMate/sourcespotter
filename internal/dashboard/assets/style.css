@@ -216,7 +216,7 @@ footer a {
 .deps-config > div {
 	display: grid;
 	gap: 0.75rem;
-	margin: 1rem 0;
+	margin: 1rem 0 2rem 0;
 	max-width: 36rem;
 }
 .deps-config > div > label {
@@ -271,4 +271,22 @@ footer a {
 	border-radius: 0;
 	padding: 0;
 	white-space: nowrap;
+}
+.deps-instructions {
+	margin: -0.50rem 0 0 0;
+	font-size: 80%;
+	color: #555;
+}
+.deps-badge {
+	padding: 0.1rem 0.3rem;
+	border-radius: 3px;
+	font-size: 90%;
+}
+.deps-badge-go {
+	background: #007d9c;
+	color: white;
+}
+.deps-badge-firstparty {
+	background: #008800;
+	color: white;
 }
