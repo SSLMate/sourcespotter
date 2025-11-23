@@ -9,7 +9,11 @@
 	const configDetails = document.getElementById('deps-config');
 
 	function getFormData() {
-		return new URLSearchParams(new FormData(form));
+		let formData = new URLSearchParams(new FormData(form));
+		if (formData.get('target') === 'linux/amd64') { formData.delete('target'); }
+		if (formData.get('tags') === '') { formData.delete('tags'); }
+		if (formData.get('firstparty') === '') { formData.delete('firstparty'); }
+		return formData;
 	}
 	function setFormData(formData) {
 		form['package'].value = formData.get('package') ?? '';
