@@ -4,6 +4,7 @@
 	const form = document.getElementById('deps-form');
 	const errors = document.getElementById('deps-errors');
 	const results = document.getElementById('deps-results');
+	const badgeinfo = document.getElementById('deps-badgeinfo');
 	const progress = document.getElementById('deps-progress');
 	const configDetails = document.getElementById('deps-config');
 
@@ -54,6 +55,7 @@
 			intro.hidden = false;
 			errors.hidden = true;
 			results.hidden = true;
+			badgeinfo.hidden = true;
 			progress.hidden = true;
 			return;
 		}
@@ -61,6 +63,7 @@
 		intro.hidden = true;
 		errors.hidden = true;
 		results.hidden = true;
+		badgeinfo.hidden = true;
 		progress.hidden = false;
 		const url = form.action + '?' + formData.toString();
 		try {
@@ -72,6 +75,7 @@
 				errors.textContent = msg;
 				errors.hidden = false;
 				results.hidden = true;
+				badgeinfo.hidden = true;
 				intro.hidden = true;
 				progress.hidden = true;
 				return;
@@ -166,8 +170,37 @@
 				}
 			}
 
+			// Build DOM for badgeinfo
+			badgeinfo.innerHTML = '';
+			const badgeURL = `https://badges.api.${document.body.dataset.domain}/deps?${formData.toString()}`;
+			let p = document.createElement('p');
+			p.appendChild(document.createTextNode('Add this badge to your project website or README to help users understand your dependencies: '));
+			let badgeLink = document.createElement('a');
+			badgeLink.href = location.href;
+			let badgeImg = document.createElement('img');
+			badgeImg.src = badgeURL;
+			badgeImg.alt = 'Dependencies';
+			badgeLink.appendChild(badgeImg);
+			p.appendChild(badgeLink);
+			badgeinfo.appendChild(p);
+
+			p = document.createElement('p');
+			p.appendChild(document.createTextNode('HTML: '));
+			let code = document.createElement('code');
+			code.textContent = badgeLink.outerHTML;
+			p.appendChild(code);
+			badgeinfo.appendChild(p);
+
+			p = document.createElement('p');
+			p.appendChild(document.createTextNode('Markdown: '));
+			code = document.createElement('code');
+			code.textContent = `[![Dependencies](${badgeURL})](${location.href})`;
+			p.appendChild(code);
+			badgeinfo.appendChild(p);
+
 			errors.hidden = true;
 			results.hidden = false;
+			badgeinfo.hidden = false;
 			intro.hidden = true;
 			progress.hidden = true;
 		} catch (err) {
@@ -175,6 +208,7 @@
 				errors.textContent = url + ": " + String(err);
 				errors.hidden = false;
 				results.hidden = true;
+				badgeinfo.hidden = true;
 				intro.hidden = true;
 				progress.hidden = true;
 			}

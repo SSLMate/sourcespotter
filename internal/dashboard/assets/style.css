@@ -290,3 +290,15 @@ footer a {
 	background: #008800;
 	color: white;
 }
+.deps-badgeinfo {
+	margin-top: 1.5rem;
+}
+.deps-badgeinfo img {
+	display: block;
+}
+.deps-badgeinfo code {
+	white-space: pre;
+	overflow-x: auto;
+	display: block;
+	padding: 0.2rem 0.4rem;
+}

@@ -123,4 +123,14 @@ CREATE TABLE telemetry_counter (
 );
 CREATE INDEX telemetry_counter_index ON telemetry_counter (program, name, version);
 
+CREATE TABLE dep_count_cache (
+	query		text NOT NULL,
+	inserted_at	timestamptz NOT NULL DEFAULT now(),
+	golang		int NOT NULL,
+	firstparty	int NOT NULL,
+	thirdparty	int NOT NULL,
+
+	PRIMARY KEY (query)
+);
+
 COMMIT;
