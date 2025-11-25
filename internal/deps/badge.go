@@ -61,7 +61,7 @@ func ServeBadge(w http.ResponseWriter, req *http.Request) {
 	text = fmt.Sprintf("%d third-party", counts.ThirdParty)
 
 	w.Header().Set("Cache-Control", "public, max-age=3600, must-revalidate")
-	http.Redirect(w, req, fmt.Sprintf("https://img.shields.io/badge/dependencies-%s-blue", text), http.StatusSeeOther)
+	http.Redirect(w, req, fmt.Sprintf("https://img.shields.io/badge/dependencies-%s-blue", strings.ReplaceAll(text, "-", "--")), http.StatusSeeOther)
 
 	//w.Header().Set("Content-Type", "image/svg+xml;charset=utf-8")
 	//w.Header().Set("X-Content-Type-Options", "nosniff")
