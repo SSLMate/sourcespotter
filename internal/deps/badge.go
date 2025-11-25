@@ -50,13 +50,15 @@ func ServeBadge(w http.ResponseWriter, req *http.Request) {
 	var text string
 	//var width int
 
-	if firstPartyPrefix == "" {
-		text = fmt.Sprintf("go/x: %d, 3rd party: %d", counts.Golang, counts.ThirdParty)
-		//width = 205
-	} else {
-		text = fmt.Sprintf("go/x: %d, 1st party: %d, 3rd party: %d", counts.Golang, counts.FirstParty, counts.ThirdParty)
-		//width = 275
-	}
+	//if firstPartyPrefix == "" {
+	//	text = fmt.Sprintf("go/x: %d, 3rd party: %d", counts.Golang, counts.ThirdParty)
+	//	width = 205
+	//} else {
+	//	text = fmt.Sprintf("go/x: %d, 1st party: %d, 3rd party: %d", counts.Golang, counts.FirstParty, counts.ThirdParty)
+	//	width = 275
+	//}
+
+	text = fmt.Sprintf("%d third-party", counts.ThirdParty)
 
 	w.Header().Set("Cache-Control", "public, max-age=3600, must-revalidate")
 	http.Redirect(w, req, fmt.Sprintf("https://img.shields.io/badge/dependencies-%s-blue", text), http.StatusSeeOther)
