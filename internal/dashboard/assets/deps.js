@@ -113,10 +113,14 @@
 			// Build DOM for results
 			results.innerHTML = '';
 			const h2 = document.createElement('h2');
+			const mainLink = document.createElement('a');
+			mainLink.href = 'https://go-mod-viewer.appspot.com/' + mainModule;
+			mainLink.textContent = mainModule;
+			h2.appendChild(mainLink);
 			if (moduleMap.size===0) {
-				h2.textContent = `${mainModule} has no dependencies`;
+				h2.appendChild(document.createTextNode(` has no dependencies`));
 			} else {
-				h2.textContent = `${mainModule} depends on ${moduleMap.size} module${moduleMap.size===1?'':'s'}:`;
+				h2.appendChild(document.createTextNode(` depends on ${moduleMap.size} module${moduleMap.size===1?'':'s'}:`));
 			}
 			results.appendChild(h2);
 
