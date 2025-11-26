@@ -158,7 +158,7 @@
 					} else if (firstPartyWithSlash && module.startsWith(firstPartyWithSlash)) {
 						const badge = document.createElement('span');
 						badge.className = 'deps-badge deps-badge-firstparty';
-						badge.textContent = 'First Party';
+						badge.textContent = 'First-Party';
 						summary.appendChild(badge);
 					}
 					details.appendChild(summary);
