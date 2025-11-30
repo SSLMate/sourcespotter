@@ -1,5 +1,5 @@
 (function() {
-	let currentController = null;
+	let inflightRequest = null;
 	const intro = document.getElementById('deps-intro');
 	const form = document.getElementById('deps-form');
 	const errors = document.getElementById('deps-errors');
@@ -44,9 +44,9 @@
 	loadState();
 
 	async function loadResults(formData) {
-		if (currentController) {
-			currentController.abort();
-			currentController = null;
+		if (inflightRequest) {
+			inflightRequest.abort();
+			inflightRequest = null;
 		}
 
 		let firstPartyWithSlash = formData.get('firstparty');
@@ -71,8 +71,8 @@
 		progress.hidden = false;
 		const url = form.action + '?' + formData.toString();
 		try {
-			currentController = new AbortController();
-			const resp = await fetch(url, {signal: currentController.signal});
+			inflightRequest = new AbortController();
+			const resp = await fetch(url, {signal: inflightRequest.signal});
 			if (!resp.ok) {
 				const body = await resp.text().catch(() => '');
 				const msg = body || `Request to ${url} failed with status ${resp.status} ${resp.statusText}`;
