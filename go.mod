@@ -1,6 +1,6 @@
 module software.sslmate.com/src/sourcespotter
 
-go 1.24.4
+go 1.24.11
 
 require (
 	github.com/aws/aws-sdk-go-v2 v1.36.5
