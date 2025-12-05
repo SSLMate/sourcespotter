@@ -108,7 +108,7 @@ func fetchCounts(ctx context.Context, query, firstPartyPrefix string) (depCounts
 
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
-		return depCounts{}, fmt.Errorf("Request to %s failed with status %d: %s", goAPI, resp.StatusCode, strings.TrimSpace(string(body)))
+		return depCounts{}, fmt.Errorf("request to %s failed with status %d: %s", goAPI, resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	return parseCounts(resp.Body, firstPartyPrefix)
