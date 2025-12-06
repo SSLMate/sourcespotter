@@ -274,6 +274,7 @@ footer a {
 	border-radius: 0;
 	padding: 0;
 	white-space: nowrap;
+	font-family: inherit;
 }
 .deps-instructions {
 	margin: -0.50rem 0 0 0;
