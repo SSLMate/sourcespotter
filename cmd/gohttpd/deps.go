@@ -52,7 +52,7 @@ func getDeps(w http.ResponseWriter, req *http.Request) error {
 	}
 	defer os.RemoveAll(tempDir)
 
-	listArgs := []string{"list", "-deps", "-f", "{{if .Module}}{{.DepOnly}} {{.Module.Path}}@{{.Module.Version}} {{.ImportPath}}{{end}}"}
+	listArgs := []string{"list", "-deps", "-f", "{{if .Module}}{{.DepOnly}} {{.Module.Path}} {{.Module.Version}} {{.ImportPath}}{{end}}"}
 	if test {
 		listArgs = append(listArgs, "-test")
 	}

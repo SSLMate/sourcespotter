@@ -90,14 +90,16 @@
 			// Parse lines: MODULE PACKAGE
 			const moduleMap = new Map();
 			let mainModule = '';
+			let mainModulePackage = '';
 			const lines = text.split(/\r?\n/);
 
 			for (const line of lines) {
 				const trimmed = line.trim();
 				if (!trimmed) continue;
 
-				const [depOnly, module, pkg] = trimmed.split(/\s+/, 3);
-				if (!module || !pkg) continue;
+				const [depOnly, modulePath, moduleVersion, pkg] = trimmed.split(/\s+/, 4);
+				if (!modulePath) continue;
+				const module = modulePath + '@' + moduleVersion;
 
 				if (!moduleMap.has(module)) {
 					moduleMap.set(module, []);
@@ -106,6 +108,7 @@
 
 				if (depOnly === 'false') {
 					mainModule = module;
+					mainModulePackage = module + pkg.slice(modulePath.length);
 				}
 			}
 			moduleMap.delete(mainModule);
@@ -114,8 +117,8 @@
 			results.innerHTML = '';
 			const h2 = document.createElement('h2');
 			const mainLink = document.createElement('a');
-			mainLink.href = 'https://go-mod-viewer.appspot.com/' + mainModule;
-			mainLink.textContent = mainModule;
+			mainLink.href = 'https://go-mod-viewer.appspot.com/' + mainModulePackage;
+			mainLink.textContent = mainModulePackage;
 			h2.appendChild(mainLink);
 			if (moduleMap.size===0) {
 				h2.appendChild(document.createTextNode(` has no dependencies`));
