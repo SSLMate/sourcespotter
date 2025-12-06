@@ -90,7 +90,7 @@
 			// Parse lines: MODULE PACKAGE
 			const moduleMap = new Map();
 			let mainModule = '';
-			let mainModulePackage = '';
+			let mainModulePackages = [];
 			const lines = text.split(/\r?\n/);
 
 			for (const line of lines) {
@@ -108,22 +108,34 @@
 
 				if (depOnly === 'false') {
 					mainModule = module;
-					mainModulePackage = module + pkg.slice(modulePath.length);
+					mainModulePackages.push(module + pkg.slice(modulePath.length));
 				}
 			}
 			moduleMap.delete(mainModule);
+			mainModulePackages.sort();
 
 			// Build DOM for results
 			results.innerHTML = '';
 			const h2 = document.createElement('h2');
-			const mainLink = document.createElement('a');
-			mainLink.href = 'https://go-mod-viewer.appspot.com/' + mainModulePackage;
-			mainLink.textContent = mainModulePackage;
-			h2.appendChild(mainLink);
+			if (mainModulePackages.length > 1) {
+				h2.classList.add('deps-multipkg');
+			}
+			let once = false;
+			for (const pkg of mainModulePackages) {
+				if (once) {
+					h2.appendChild(document.createTextNode(', '));
+					h2.appendChild(document.createElement('br'));
+				}
+				const link = document.createElement('a');
+				link.href = 'https://go-mod-viewer.appspot.com/' + pkg;
+				link.textContent = pkg;
+				h2.appendChild(link);
+				once = true;
+			}
 			if (moduleMap.size===0) {
-				h2.appendChild(document.createTextNode(` has no dependencies`));
+				h2.appendChild(document.createTextNode(` ${mainModulePackages.length===1?'has':'have'} no dependencies`));
 			} else {
-				h2.appendChild(document.createTextNode(` depends on ${moduleMap.size} module${moduleMap.size===1?'':'s'}:`));
+				h2.appendChild(document.createTextNode(` depend${mainModulePackages.length===1?'s':''} on ${moduleMap.size} module${moduleMap.size===1?'':'s'}:`));
 			}
 			results.appendChild(h2);
 

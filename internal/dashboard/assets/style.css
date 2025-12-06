@@ -249,6 +249,9 @@ footer a {
 .deps-results > h2 {
 	margin: 0;
 }
+.deps-results > h2.deps-multipkg {
+	font-size: 100%;
+}
 .deps-results > ul {
 	list-style: none;
 	padding: 0;
