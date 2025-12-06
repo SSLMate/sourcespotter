@@ -239,16 +239,13 @@ footer a {
 	white-space: pre;
 	overflow-x: auto;
 }
-.deps-results {
+.deps-results > ul {
 	padding: 0.75rem 1rem;
 	border: 1px solid #999;
 	background-color: #f3f3f3;
 	color: #000;
 	border-radius: 4px;
-}
-.deps-results > ul {
 	list-style: none;
-	padding: 0;
 	margin: 1rem 0 0 0;
 	display: grid;
 	gap: 0.33rem;
