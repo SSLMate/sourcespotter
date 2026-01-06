@@ -180,6 +180,9 @@ footer a {
         cursor: pointer;
 }
 
+.deps-intro summary {
+	font-weight: bold;
+}
 .deps-form {
 	max-width: 55rem;
 	margin: 1.5rem 0;
