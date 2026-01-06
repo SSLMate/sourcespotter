@@ -19,10 +19,8 @@
           <a href="/" class='header-link {{ if eq .Request.URL.Path "/" }}header-selected{{ end }}'>About</a>
           <a href="/sumdb/" class='header-link {{ if eq .Request.URL.Path "/sumdb/" }}header-selected{{ end }}'>sumdb</a>
           <a href="/modules/" class='header-link {{ if eq .Request.URL.Path "/modules/" }}header-selected{{ end }}'>Modules</a>
-		  <!--
-          <a href="/deps/" class='header-link {{ if eq .Request.URL.Path "/deps/" }}header-selected{{ end }}'>Deps</a>
-		  -->
           <a href="/toolchain/" class='header-link {{ if eq .Request.URL.Path "/toolchain/" }}header-selected{{ end }}'>Toolchains</a>
+          <a href="/deps/" class='header-link {{ if eq .Request.URL.Path "/deps/" }}header-selected{{ end }}'>Deps</a>
           <a href="/telemetry/" class='header-link {{ if eq .Request.URL.Path "/telemetry/" }}header-selected{{ end }}'>Telemetry</a>
 		  <!--
           <a href="/modcheck/" class='header-link {{ if eq .Request.URL.Path "/modcheck/" }}header-selected{{ end }}'>Modcheck</a>
