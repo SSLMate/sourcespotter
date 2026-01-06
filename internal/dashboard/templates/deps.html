@@ -22,6 +22,21 @@
 			If no version is specified, the <code>latest</code> version is analyzed.
 		</p>
 	</div>
+	<details>
+		<summary style="font-weight:bold">Methodology</summary>
+		<ol>
+			<li>Create a temporary module.</li>
+			<li>Run <code>go get <var>PACKAGE</var></code> to download the specified package.</li>
+			<li>
+				Run <code>go list -deps -f {{`"{{if .Module}}{{.DepOnly}} {{.Module.Path}} {{.Module.Version}} {{.ImportPath}}{{end}}"`}} <var>PACKAGE</var></code>.
+				Checking for <code>.Module</code> excludes packages in the standard library. <code>.DepOnly</code> is used to distinguish
+				between packages in the same module as <code>PACKAGE</code> and packages in a dependency.
+			</li>
+			<li>
+				The output of <code>go list</code> is grouped by module path and version and rendered below.
+			</li>
+		</ol>
+	</details>
 	<form class="deps-form" id="deps-form" method="get" action="https://go.api.{{$.Domain}}/deps">
 		<details class="deps-config" id="deps-config">
 			<summary>Options</summary>
