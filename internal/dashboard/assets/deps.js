@@ -87,7 +87,7 @@
 
 			const text = await resp.text();
 
-			// Parse lines: MODULE PACKAGE
+			// Parse lines
 			const moduleMap = new Map();
 			let mainModule = '';
 			let mainModulePackages = [];
