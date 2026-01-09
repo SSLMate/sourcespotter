@@ -42,12 +42,14 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"runtime"
 	"strings"
 
 	"golang.org/x/mod/modfile"
 	"golang.org/x/mod/module"
 	"golang.org/x/mod/sumdb/dirhash"
 	modzip "golang.org/x/mod/zip"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -190,37 +192,48 @@ func runAuthorize(tags []string) error {
 	domain := sourcespotterDomain()
 	endpoint := fmt.Sprintf("https://v1.api.%s/modules/authorized", domain)
 
-	for _, tag := range tags {
-		subdir, version, err := parseTag(tag)
-		if err != nil {
-			return err
-		}
-		moduleDir := filepath.Join(repoRoot, subdir)
-		modulePath, err := modulePathFromFile(filepath.Join(moduleDir, "go.mod"))
-		if err != nil {
-			return err
-		}
+	goSumLines := make([]string, len(tags))
+	group := errgroup.Group{}
+	group.SetLimit(runtime.GOMAXPROCS(0))
+	for i, tag := range tags {
+		group.Go(func() error {
+			subdir, version, err := parseTag(tag)
+			if err != nil {
+				return err
+			}
+			moduleDir := filepath.Join(repoRoot, subdir)
+			modulePath, err := modulePathFromFile(filepath.Join(moduleDir, "go.mod"))
+			if err != nil {
+				return err
+			}
 
-		hash, err := hashModuleZip(repoRoot, tag, subdir, modulePath, version)
-		if err != nil {
-			return err
-		}
+			hash, err := hashModuleZip(repoRoot, tag, subdir, modulePath, version)
+			if err != nil {
+				return err
+			}
 
-		goSum := fmt.Sprintf("%s %s %s\n", modulePath, version, hash)
-		sig := ed25519.Sign(priv, []byte(goSum))
+			goSumLines[i] = fmt.Sprintf("%s %s %s\n", modulePath, version, hash)
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return err
+	}
 
-		payload := struct {
-			Ed25519   []byte
-			GoSum     string
-			Signature []byte
-		}{
-			Ed25519:   pub,
-			GoSum:     goSum,
-			Signature: sig,
-		}
-		if err := postAuthorized(endpoint, payload); err != nil {
-			return err
-		}
+	goSum := strings.Join(goSumLines, "")
+	sig := ed25519.Sign(priv, []byte(goSum))
+
+	payload := struct {
+		Ed25519   []byte
+		GoSum     string
+		Signature []byte
+	}{
+		Ed25519:   pub,
+		GoSum:     goSum,
+		Signature: sig,
+	}
+	if err := postAuthorized(endpoint, payload); err != nil {
+		return err
 	}
 	return nil
 }
