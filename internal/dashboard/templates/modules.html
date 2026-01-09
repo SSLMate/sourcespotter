@@ -77,7 +77,30 @@
 	GoSum     string // A go.sum file listing authorized module versions
 	Signature []byte // Ed25519 signature over GoSum
 }</pre>
-        </section>
 
+				<p>
+						You can use the <strong>sourcespotter-authorize</strong> command to authorize module versions
+						in a local Git repository. Typically, you would run sourcespotter-authorize
+						right after you run <code>git tag</code> to release a new version.
+				</p>
+
+				<p>Install the command:</p>
+				<pre>$ go install software.sslmate.com/src/sourcespotter/cmd/sourcespotter-authorize@latest</pre>
+
+				<p>Generate a new key (stored in <code>$XDG_CONFIG_HOME/sourcespotter-authorize/private_key</code> by default):</p>
+				<pre>$ sourcespotter-authorize -keygen</pre>
+
+				<p>Print the public key (base64):</p>
+				<pre>$ sourcespotter-authorize -pubkey</pre>
+
+				<p>Print the URL for the current module's Atom feed:</p>
+				<pre>$ sourcespotter-authorize -feed</pre>
+
+				<p>Authorize a specific tag (or submodule tag like <code>subdir/v1.2.3</code>):</p>
+				<pre>$ sourcespotter-authorize v1.2.3</pre>
+
+				<p>Authorize every tag in the repository:</p>
+				<pre>$ sourcespotter-authorize $(git tag)</pre>
+		</section>
 </main>
 {{ end }}
