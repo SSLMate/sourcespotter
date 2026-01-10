@@ -235,7 +235,7 @@
 						const funcFrames = trace.filter(f => f.function);
 						if (funcFrames.length > 0) {
 							const tracesHeader = document.createElement('strong');
-							tracesHeader.textContent = 'Call stack:';
+							tracesHeader.textContent = 'Example call stack:';
 							tracesHeader.className = 'vuln-traces-header';
 							content.appendChild(tracesHeader);
 
