@@ -132,7 +132,7 @@
 			} else {
 				const h2 = document.createElement('h2');
 				h2.className = 'vulns-warning';
-				h2.textContent = `⚠ Found ${findingsByOSV.size} vulnerability${findingsByOSV.size === 1 ? '' : 'ies'}`;
+				h2.textContent = `⚠ Found ${findingsByOSV.size} vulnerabilit${findingsByOSV.size === 1 ? 'y' : 'ies'}`;
 				results.appendChild(h2);
 
 				const vulnList = document.createElement('div');
