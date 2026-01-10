@@ -245,18 +245,39 @@
 
 								// Build call chain from trace (reversed, as trace goes from vuln to caller)
 								const frames = [...finding.trace].reverse();
-								const chain = frames.map(frame => {
+								let first = true;
+								for (const frame of frames) {
+									let label = '';
 									if (frame.function) {
-										return `${frame.package || ''}.${frame.function}`;
+										label = `${frame.package || ''}.${frame.function}`;
 									} else if (frame.package) {
-										return frame.package;
+										label = frame.package;
 									} else if (frame.module) {
-										return frame.module;
+										label = frame.module;
 									}
-									return '?';
-								}).filter(s => s && s !== '?');
+									if (!label) continue;
 
-								traceCode.textContent = chain.join(' → ');
+									if (!first) {
+										traceCode.appendChild(document.createTextNode(' → '));
+									}
+									first = false;
+
+									// Create link if we have position info
+									if (frame.position && frame.position.filename && frame.module && frame.version) {
+										const link = document.createElement('a');
+										let url = `https://go-mod-viewer.appspot.com/${frame.module}@${frame.version}/${frame.position.filename}`;
+										if (frame.position.line) {
+											url += `#L${frame.position.line}`;
+										}
+										link.href = url;
+										link.textContent = label;
+										link.className = 'vuln-trace-link';
+										traceCode.appendChild(link);
+									} else {
+										traceCode.appendChild(document.createTextNode(label));
+									}
+								}
+
 								traceLi.appendChild(traceCode);
 								tracesList.appendChild(traceLi);
 							}

@@ -461,6 +461,13 @@ footer a {
 	white-space: pre-wrap;
 	word-break: break-all;
 }
+.vuln-trace-link {
+	color: #338;
+	text-decoration: none;
+}
+.vuln-trace-link:hover {
+	text-decoration: underline;
+}
 .vuln-refs {
 	margin-top: 1rem;
 	padding-top: 0.75rem;
