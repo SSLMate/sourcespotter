@@ -23,7 +23,7 @@
 // sale, use or other dealings in this Software without prior written
 // authorization.
 
-package vulncheck
+package vulns
 
 import (
 	"net/http"
