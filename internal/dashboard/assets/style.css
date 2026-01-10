@@ -306,3 +306,167 @@ footer a {
 	display: block;
 	padding: 0.2rem 0.4rem;
 }
+
+/* Vulns page styles */
+.vulns-intro summary {
+	font-weight: bold;
+}
+.vulns-form {
+	max-width: 55rem;
+	margin: 1.5rem 0;
+}
+.vulns-form label, .vulns-form summary {
+	font-weight: bold;
+}
+.vulns-form label input[type="text"],
+.vulns-form label select {
+	font-weight: normal;
+}
+.vulns-package {
+	display: flex;
+	align-items: center;
+	gap: 0.5rem;
+}
+.vulns-package > * {
+	white-space: nowrap;
+	box-sizing: border-box;
+}
+.vulns-package > input {
+	flex: 1;
+	min-width: 0;
+	padding: 0 0.6rem;
+}
+.vulns-package > button {
+	padding: 0 1.5rem;
+}
+.vulns-package > input,
+.vulns-package > button {
+	height: 2.5rem;
+	font-size: 1rem;
+}
+.vulns-config > div {
+	display: grid;
+	gap: 0.75rem;
+	margin: 1rem 0 2rem 0;
+	max-width: 36rem;
+}
+.vulns-config > div > label {
+	display: flex;
+	gap: 0.35rem;
+	flex-direction: row;
+	align-items: center;
+}
+.vulns-config > div > label > input[type="text"],
+.vulns-config > div > label > select {
+	flex: 1;
+	min-width: 0;
+}
+.vulns-error {
+	padding: 0.75rem 1rem;
+	border: 1px solid #c33;
+	background-color: #fbeaea;
+	color: #c33;
+	border-radius: 4px;
+	white-space: pre;
+	overflow-x: auto;
+}
+.vulns-progress-text {
+	text-align: center;
+	color: #666;
+}
+.vulns-results h2.vulns-safe {
+	color: #228822;
+	margin-bottom: 0.5rem;
+}
+.vulns-results h2.vulns-warning {
+	color: #cc3300;
+	margin-bottom: 1rem;
+}
+.vulns-list {
+	display: flex;
+	flex-direction: column;
+	gap: 1rem;
+}
+.vuln-card {
+	border: 1px solid #ddd;
+	border-radius: 6px;
+	background: #fafafa;
+	overflow: hidden;
+}
+.vuln-card[open] {
+	background: #fff;
+}
+.vuln-summary {
+	padding: 0.75rem 1rem;
+	background: #f5f5f5;
+	border-bottom: 1px solid #eee;
+	cursor: pointer;
+	font-weight: normal;
+}
+.vuln-summary:hover {
+	background: #eee;
+}
+.vuln-id {
+	font-weight: bold;
+	color: #c33;
+	text-decoration: none;
+}
+.vuln-id:hover {
+	text-decoration: underline;
+}
+.vuln-title {
+	color: #333;
+}
+.vuln-content {
+	padding: 1rem;
+}
+.vuln-description {
+	margin: 0 0 1rem 0;
+	color: #444;
+	line-height: 1.5;
+}
+.vuln-affected {
+	margin: 0.5rem 0;
+	padding: 0.5rem 0.75rem;
+	background: #f9f9f9;
+	border-radius: 4px;
+	border-left: 3px solid #cc6600;
+}
+.vuln-affected code {
+	background: #eee;
+}
+.vuln-versions {
+	font-size: 90%;
+	color: #666;
+	margin-top: 0.25rem;
+}
+.vuln-traces-header {
+	display: block;
+	margin-top: 1rem;
+	margin-bottom: 0.5rem;
+}
+.vuln-traces {
+	margin: 0;
+	padding-left: 1.5rem;
+	list-style: disc;
+}
+.vuln-traces li {
+	margin: 0.25rem 0;
+}
+.vuln-trace {
+	font-size: 85%;
+	background: #f3f3f3;
+	padding: 0.2rem 0.4rem;
+	border-radius: 3px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+.vuln-refs {
+	margin-top: 1rem;
+	padding-top: 0.75rem;
+	border-top: 1px solid #eee;
+	font-size: 90%;
+}
+.vuln-refs a {
+	color: #338;
+}

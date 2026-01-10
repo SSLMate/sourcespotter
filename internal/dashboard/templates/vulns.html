@@ -1,0 +1,61 @@
+{{ define "content" }}
+<main class="vulns">
+	<h1>Go Vulnerability Check</h1>
+	<div class="vulns-intro" id="vulns-intro">
+		<p>
+			This page uses <a href="https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck">govulncheck</a>
+			to scan a Go package for known vulnerabilities from the
+			<a href="https://vuln.go.dev/">Go Vulnerability Database</a>.
+		</p>
+		<p>
+			Enter a package import path to analyze. You can specify
+			patterns (e.g. <code>software.sslmate.com/src/sourcespotter/cmd/...</code>)
+			and/or versions (e.g. <code>software.sslmate.com/src/sourcespotter@v0.0.5</code>).
+			If no version is specified, the <code>latest</code> version is analyzed.
+		</p>
+		<details>
+			<summary>About govulncheck</summary>
+			<p>
+				Govulncheck analyzes your code and reports vulnerabilities that actually
+				affect your code, based on which functions in your code are transitively
+				calling vulnerable functions. This reduces noise compared to just
+				matching module versions.
+			</p>
+		</details>
+	</div>
+	<form class="vulns-form" id="vulns-form" method="get" action="{{ .GoAPI }}/vulncheck">
+		<input type="hidden" name="format" value="json"/>
+		<details class="vulns-config" id="vulns-config">
+			<summary>Options</summary>
+
+			<div>
+				<label>
+						Target:
+						<select name="target">
+								{{ range .Targets }}
+								<option value="{{ . }}">{{ . }}</option>
+								{{ end }}
+						</select>
+				</label>
+				<label>
+						Build tags:
+						<input type="text" name="tags" placeholder="tag1,tag2"/>
+				</label>
+				<label>
+						<input type="checkbox" name="test" value="1"/>
+						Include test dependencies
+				</label>
+			</div>
+		</details>
+		<p class="vulns-package">
+			<label for="vulns-packageinput">Package:</label>
+			<input autofocus id="vulns-packageinput" type="text" name="package" required placeholder="software.sslmate.com/src/sourcespotter"/>
+			<button type="submit">Check vulnerabilities</button>
+		</p>
+	</form>
+	<div class="vulns-error" id="vulns-errors" hidden></div>
+	<div class="vulns-results" id="vulns-results" hidden></div>
+	<div id="vulns-progress" hidden><div class="spinner"></div><p class="vulns-progress-text">Scanning for vulnerabilities...</p></div>
+	<script src="/assets/vulns.js"></script>
+</main>
+{{ end }}
