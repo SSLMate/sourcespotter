@@ -100,9 +100,16 @@
 				}
 			}
 
+			// Filter to only reachable findings (those with a function in the trace)
+			// Module-level and package-level findings don't have function info
+			const reachableFindings = findings.filter(finding => {
+				if (!finding.trace || finding.trace.length === 0) return false;
+				return finding.trace.some(frame => frame.function);
+			});
+
 			// Group findings by OSV ID
 			const findingsByOSV = new Map();
-			for (const finding of findings) {
+			for (const finding of reachableFindings) {
 				const id = finding.osv;
 				if (!findingsByOSV.has(id)) {
 					findingsByOSV.set(id, []);
