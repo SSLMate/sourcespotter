@@ -33,4 +33,5 @@ var (
 	DB        *sql.DB
 	DBAddress string
 	Domain    string
+	GoAPI     string
 )

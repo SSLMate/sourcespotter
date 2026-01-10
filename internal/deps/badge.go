@@ -90,7 +90,7 @@ func getCachedCounts(ctx context.Context, noCache bool, query string) (depCounts
 }
 
 func fetchCounts(ctx context.Context, query, firstPartyPrefix string) (depCounts, error) {
-	goAPI := fmt.Sprintf("https://go.api.%s/deps", sourcespotter.Domain)
+	goAPI := sourcespotter.GoAPI + "/deps"
 	if query != "" {
 		goAPI += "?" + query
 	}

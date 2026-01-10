@@ -31,6 +31,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"slices"
@@ -74,6 +75,7 @@ func main() {
 	}
 	var cfg struct {
 		Domain    string
+		GoAPI     string
 		Database  string
 		Listen    []string
 		Toolchain struct {
@@ -89,6 +91,11 @@ func main() {
 	}
 
 	sourcespotter.Domain = cfg.Domain
+	if cfg.GoAPI == "" {
+		sourcespotter.GoAPI = fmt.Sprintf("https://go.api.%s", cfg.Domain)
+	} else {
+		sourcespotter.GoAPI = cfg.GoAPI
+	}
 	sourcespotter.DBAddress = cfg.Database
 	if db, err := sql.Open("postgres", cfg.Database); err == nil {
 		sourcespotter.DB = db

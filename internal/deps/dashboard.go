@@ -60,12 +60,14 @@ var targets = []string{
 
 type dashboardData struct {
 	Domain  string
+	GoAPI   string
 	Targets []string
 }
 
 func ServeDashboard(w http.ResponseWriter, req *http.Request) {
 	data := &dashboardData{
 		Domain:  sourcespotter.Domain,
+		GoAPI:   sourcespotter.GoAPI,
 		Targets: targets,
 	}
 
