@@ -447,19 +447,19 @@ footer a {
 }
 .vuln-traces {
 	margin: 0;
-	padding-left: 1.5rem;
-	list-style: disc;
+	padding: 0.5rem 0.75rem;
+	background: #f8f8f8;
+	border-radius: 4px;
+	font-family: ui-monospace, monospace;
+	font-size: 13px;
+	line-height: 1.5;
+	overflow-x: auto;
 }
-.vuln-traces li {
-	margin: 0.25rem 0;
+.vuln-trace-line {
+	white-space: nowrap;
 }
-.vuln-trace {
-	font-size: 85%;
-	background: #f3f3f3;
-	padding: 0.2rem 0.4rem;
-	border-radius: 3px;
-	white-space: pre-wrap;
-	word-break: break-all;
+.vuln-trace-num {
+	color: #666;
 }
 .vuln-trace-link {
 	color: #338;
@@ -467,6 +467,9 @@ footer a {
 }
 .vuln-trace-link:hover {
 	text-decoration: underline;
+}
+.vuln-trace-call {
+	color: #333;
 }
 .vuln-refs {
 	margin-top: 1rem;

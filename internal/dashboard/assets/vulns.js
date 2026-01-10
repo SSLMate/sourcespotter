@@ -227,63 +227,84 @@
 						}
 					}
 
-					// Show call traces
-					if (vulnFindings.length > 0) {
-						const tracesHeader = document.createElement('strong');
-						tracesHeader.textContent = 'Call stacks:';
-						tracesHeader.className = 'vuln-traces-header';
-						content.appendChild(tracesHeader);
+					// Show call trace (only the first one, formatted like govulncheck text mode)
+					if (vulnFindings.length > 0 && vulnFindings[0].trace && vulnFindings[0].trace.length > 0) {
+						const trace = vulnFindings[0].trace;
+						
+						// Find frames with functions (the actual call chain)
+						const funcFrames = trace.filter(f => f.function);
+						if (funcFrames.length > 0) {
+							const tracesHeader = document.createElement('strong');
+							tracesHeader.textContent = 'Call stack:';
+							tracesHeader.className = 'vuln-traces-header';
+							content.appendChild(tracesHeader);
 
-						const tracesList = document.createElement('ul');
-						tracesList.className = 'vuln-traces';
+							const tracesList = document.createElement('div');
+							tracesList.className = 'vuln-traces';
 
-						for (const finding of vulnFindings) {
-							if (finding.trace && finding.trace.length > 0) {
-								const traceLi = document.createElement('li');
-								const traceCode = document.createElement('code');
-								traceCode.className = 'vuln-trace';
-
-								// Build call chain from trace (reversed, as trace goes from vuln to caller)
-								const frames = [...finding.trace].reverse();
-								let first = true;
-								for (const frame of frames) {
-									let label = '';
-									if (frame.function) {
-										label = `${frame.package || ''}.${frame.function}`;
-									} else if (frame.package) {
-										label = frame.package;
-									} else if (frame.module) {
-										label = frame.module;
-									}
-									if (!label) continue;
-
-									if (!first) {
-										traceCode.appendChild(document.createTextNode(' → '));
-									}
-									first = false;
-
-									// Create link if we have position info
-									if (frame.position && frame.position.filename && frame.module && frame.version) {
+							// Format: file:line:col: caller calls callee
+							// Trace is ordered from vulnerable func to user code, so reverse for display
+							const reversed = [...funcFrames].reverse();
+							for (let i = 0; i < reversed.length; i++) {
+								const frame = reversed[i];
+								const nextFrame = reversed[i + 1]; // the function being called
+								
+								const line = document.createElement('div');
+								line.className = 'vuln-trace-line';
+								
+								// Line number prefix
+								const numSpan = document.createElement('span');
+								numSpan.className = 'vuln-trace-num';
+								numSpan.textContent = `#${i + 1}: `;
+								line.appendChild(numSpan);
+								
+								// File location with link
+								if (frame.position && frame.position.filename) {
+									const pos = frame.position;
+									const locText = `${pos.filename}:${pos.line || 0}:${pos.column || 0}`;
+									
+									if (frame.module && frame.version) {
 										const link = document.createElement('a');
-										let url = `https://go-mod-viewer.appspot.com/${frame.module}@${frame.version}/${frame.position.filename}`;
-										if (frame.position.line) {
-											url += `#L${frame.position.line}`;
-										}
+										let url = `https://go-mod-viewer.appspot.com/${frame.module}@${frame.version}/${pos.filename}`;
+										if (pos.line) url += `#L${pos.line}`;
 										link.href = url;
-										link.textContent = label;
+										link.textContent = locText;
 										link.className = 'vuln-trace-link';
-										traceCode.appendChild(link);
+										line.appendChild(link);
 									} else {
-										traceCode.appendChild(document.createTextNode(label));
+										line.appendChild(document.createTextNode(locText));
 									}
+									line.appendChild(document.createTextNode(': '));
 								}
-
-								traceLi.appendChild(traceCode);
-								tracesList.appendChild(traceLi);
+								
+								// Get short function names (just the type.Method or funcName part)
+								const getShortName = (f) => {
+									if (!f) return '';
+									const pkg = f.package || '';
+									const parts = pkg.split('/');
+									const shortPkg = parts[parts.length - 1] || '';
+									if (f.receiver) {
+										return `${shortPkg}.${f.receiver}.${f.function}`;
+									}
+									return `${shortPkg}.${f.function}`;
+								};
+								
+								const callerName = getShortName(frame);
+								const calleeName = nextFrame ? getShortName(nextFrame) : '';
+								
+								const callSpan = document.createElement('span');
+								callSpan.className = 'vuln-trace-call';
+								if (calleeName) {
+									callSpan.textContent = `${callerName} calls ${calleeName}`;
+								} else {
+									// Last frame (the vulnerable function)
+									callSpan.textContent = callerName;
+								}
+								line.appendChild(callSpan);
+								
+								tracesList.appendChild(line);
 							}
-						}
-
-						if (tracesList.children.length > 0) {
+							
 							content.appendChild(tracesList);
 						}
 					}
