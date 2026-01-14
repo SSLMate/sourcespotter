@@ -7,6 +7,7 @@
 	const badgeinfo = document.getElementById('deps-badgeinfo');
 	const progress = document.getElementById('deps-progress');
 	const configDetails = document.getElementById('deps-config');
+	const baseTitle = document.title;
 
 	function getFormData() {
 		let formData = new URLSearchParams(new FormData(form));
@@ -55,6 +56,7 @@
 		}
 
 		const pkg = formData.get('package') ?? '';
+		document.title = pkg ? `${pkg} - ${baseTitle}` : baseTitle;
 		if (pkg === '') {
 			intro.hidden = false;
 			errors.hidden = true;
