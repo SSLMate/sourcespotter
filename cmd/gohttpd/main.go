@@ -76,7 +76,7 @@ func main() {
 
 	server := &http.Server{
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 30 * time.Second,
+		WriteTimeout: 90 * time.Second,
 		IdleTimeout:  3 * time.Second,
 		Handler:      mux,
 		ErrorLog:     logfilter.New(log.Default(), logfilter.HTTPServerErrors),
