@@ -31,6 +31,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -111,7 +112,16 @@ func hashGoMod(zipfile string, mod module.Version, hash dirhash.Hash) (string, e
 		return "", err
 	}
 	defer z.Close()
-	open := func(string) (io.ReadCloser, error) { return z.Open(mod.Path + "@" + mod.Version + "/go.mod") }
+	open := func(string) (io.ReadCloser, error) {
+		r, err := z.Open(mod.Path + "@" + mod.Version + "/go.mod")
+		if err == nil {
+			return r, nil
+		} else if errors.Is(err, fs.ErrNotExist) {
+			return io.NopCloser(strings.NewReader("module " + mod.Path + "\n")), nil
+		} else {
+			return nil, err
+		}
+	}
 	return hash([]string{"go.mod"}, open)
 }
 
