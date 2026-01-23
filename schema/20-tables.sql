@@ -71,7 +71,8 @@ CREATE TABLE authorized_record (
         pubkey          bytea NOT NULL,
         module          text NOT NULL,
         version         text NOT NULL,
-        source_sha256   bytea NOT NULL,
+        source_sha256   bytea,
+        gomod_sha256    bytea,
 
         PRIMARY KEY (pubkey, module, version)
 );

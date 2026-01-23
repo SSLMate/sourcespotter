@@ -27,6 +27,7 @@
 package main
 
 import (
+	"archive/zip"
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -207,12 +208,13 @@ func runAuthorize(tags []string) error {
 				return err
 			}
 
-			hash, err := hashModuleZip(repoRoot, tag, subdir, modulePath, version)
+			zipHash, gomodHash, err := hashModuleZip(repoRoot, tag, subdir, modulePath, version)
 			if err != nil {
 				return err
 			}
 
-			goSumLines[i] = fmt.Sprintf("%s %s %s\n", modulePath, version, hash)
+			goSumLines[i] = fmt.Sprintf("%s %s %s\n", modulePath, version, zipHash)
+			goSumLines[i] += fmt.Sprintf("%s %s/go.mod %s\n", modulePath, version, gomodHash)
 			return nil
 		})
 	}
@@ -347,22 +349,40 @@ func parseTag(tag string) (string, string, error) {
 	return subdir, version, nil
 }
 
-func hashModuleZip(repoRoot, revision, subdir, modulePath, version string) (string, error) {
+func hashModuleZip(repoRoot, revision, subdir, modulePath, version string) (string, string, error) {
 	tempFile, err := os.CreateTemp("", "sourcespotter-authorize-*.zip")
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	defer os.Remove(tempFile.Name())
 	defer tempFile.Close()
 
 	modVersion := module.Version{Path: modulePath, Version: version}
 	if err := modzip.CreateFromVCS(tempFile, modVersion, repoRoot, revision, subdir); err != nil {
-		return "", err
+		return "", "", err
 	}
 	if err := tempFile.Close(); err != nil {
+		return "", "", err
+	}
+	zipHash, err := dirhash.HashZip(tempFile.Name(), dirhash.Hash1)
+	if err != nil {
+		return "", "", err
+	}
+	gomodHash, err := hashGoMod(tempFile.Name(), modVersion, dirhash.Hash1)
+	if err != nil {
+		return "", "", err
+	}
+	return zipHash, gomodHash, nil
+}
+
+func hashGoMod(zipfile string, mod module.Version, hash dirhash.Hash) (string, error) {
+	z, err := zip.OpenReader(zipfile)
+	if err != nil {
 		return "", err
 	}
-	return dirhash.HashZip(tempFile.Name(), dirhash.Hash1)
+	defer z.Close()
+	open := func(string) (io.ReadCloser, error) { return z.Open(mod.Path + "@" + mod.Version + "/go.mod") }
+	return hash([]string{"go.mod"}, open)
 }
 
 func postAuthorized(endpoint string, payload any) error {

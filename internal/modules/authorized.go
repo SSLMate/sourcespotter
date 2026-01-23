@@ -71,15 +71,19 @@ func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 			http.Error(w, fmt.Sprintf("Invalid go.sum line %d", lineNum), http.StatusBadRequest)
 			return
 		}
-		if strings.HasSuffix(fields[1], "/go.mod") {
-			continue
-		}
+		module := fields[0]
+		version := fields[1]
 		hash, err := parseHash(fields[2])
 		if err != nil {
 			http.Error(w, fmt.Sprintf("Invalid hash on line %d: %v", lineNum, err), http.StatusBadRequest)
 			return
 		}
-		if _, err := tx.ExecContext(req.Context(), `INSERT INTO authorized_record (pubkey, module, version, source_sha256) VALUES ($1,$2,$3,$4) ON CONFLICT (pubkey,module,version) DO UPDATE SET source_sha256=excluded.source_sha256`, body.Ed25519, fields[0], fields[1], hash); err != nil {
+		columnName := "source_sha256"
+		if s, ok := strings.CutSuffix(version, "/go.mod"); ok {
+			columnName = "gomod_sha256"
+			version = s
+		}
+		if _, err := tx.ExecContext(req.Context(), `INSERT INTO authorized_record (pubkey, module, version, `+columnName+`) VALUES ($1,$2,$3,$4) ON CONFLICT (pubkey,module,version) DO UPDATE SET `+columnName+`=excluded.`+columnName, body.Ed25519, module, version, hash); err != nil {
 			log.Print(err)
 			http.Error(w, "Internal Database Error", http.StatusInternalServerError)
 			return

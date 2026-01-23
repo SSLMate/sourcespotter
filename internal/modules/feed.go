@@ -60,7 +60,7 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 		args = append(args, module)
 	}
 	if pubkey != nil {
-		query += ` AND NOT EXISTS (SELECT 1 FROM authorized_record ar WHERE (ar.pubkey,ar.module,ar.version,ar.source_sha256)=($2,r.module,r.version,r.source_sha256))`
+		query += ` AND NOT EXISTS (SELECT 1 FROM authorized_record ar WHERE (ar.pubkey,ar.module,ar.version,ar.source_sha256,ar.gomod_sha256) IS NOT DISTINCT FROM ($2,r.module,r.version,r.source_sha256,r.gomod_sha256))`
 		args = append(args, pubkey)
 	}
 	query += ` ORDER BY module, version, db_id, "position" DESC`
@@ -110,7 +110,8 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 		if r.ObservedAt.After(latest) {
 			latest = r.ObservedAt
 		}
-		body := fmt.Sprintf("h1:%s", base64.StdEncoding.EncodeToString(r.SourceSHA256))
+		body := fmt.Sprintf("h1:%s\n", base64.StdEncoding.EncodeToString(r.SourceSHA256))
+		body += fmt.Sprintf("go.mod h1:%s\n", base64.StdEncoding.EncodeToString(r.GomodSHA256))
 		entry := atom.Entry{
 			Title:   fmt.Sprintf("%s@%s", r.Module, r.Version),
 			ID:      fmt.Sprintf("%s#%s@%s", baseURL, r.Module, r.Version),
