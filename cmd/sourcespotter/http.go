@@ -72,6 +72,7 @@ func newHTTPServer() *http.Server {
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
 	// v1 public API
 	mux.HandleFunc("POST v1.api."+domain+"/modules/authorized", modules.ReceiveAuthorized)
+	mux.HandleFunc("GET v1.api."+domain+"/modules/authorized", modules.ServeAuthorized)
 
 	return &http.Server{
 		ReadTimeout:  5 * time.Second,

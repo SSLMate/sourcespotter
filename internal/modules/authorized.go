@@ -100,3 +100,51 @@ func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 	}
 	w.WriteHeader(http.StatusNoContent)
 }
+
+func ServeAuthorized(w http.ResponseWriter, req *http.Request) {
+	pubkeyParam := req.URL.Query().Get("ed25519")
+	if pubkeyParam == "" {
+		http.Error(w, "Missing ed25519 parameter", http.StatusBadRequest)
+		return
+	}
+	pubkey, err := base64.StdEncoding.DecodeString(pubkeyParam)
+	if err != nil {
+		http.Error(w, "Invalid ed25519 parameter: invalid base64", http.StatusBadRequest)
+		return
+	}
+	if len(pubkey) != ed25519.PublicKeySize {
+		http.Error(w, "Invalid ed25519 parameter: wrong length", http.StatusBadRequest)
+		return
+	}
+
+	rows, err := sourcespotter.DB.QueryContext(req.Context(), `SELECT module, version, source_sha256, gomod_sha256 FROM authorized_record WHERE pubkey = $1 ORDER BY module, version`, pubkey)
+	if err != nil {
+		log.Print(err)
+		http.Error(w, "Internal Database Error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	w.Header().Set("X-Content-Type-Options", "nosniff")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	for rows.Next() {
+		var module string
+		var version string
+		var sourceHash []byte
+		var gomodHash []byte
+		if err := rows.Scan(&module, &version, &sourceHash, &gomodHash); err != nil {
+			log.Print(err)
+			return
+		}
+		if len(sourceHash) > 0 {
+			fmt.Fprintf(w, "%s %s %s%s\n", module, version, hashPrefix, base64.StdEncoding.EncodeToString(sourceHash))
+		}
+		if len(gomodHash) > 0 {
+			fmt.Fprintf(w, "%s %s/go.mod %s%s\n", module, version, hashPrefix, base64.StdEncoding.EncodeToString(gomodHash))
+		}
+	}
+	if err := rows.Err(); err != nil {
+		log.Print(err)
+	}
+}
