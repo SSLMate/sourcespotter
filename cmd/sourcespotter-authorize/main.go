@@ -27,7 +27,6 @@
 package main
 
 import (
-	"archive/zip"
 	"bytes"
 	"crypto/ed25519"
 	"crypto/rand"
@@ -47,10 +46,8 @@ import (
 	"strings"
 
 	"golang.org/x/mod/modfile"
-	"golang.org/x/mod/module"
-	"golang.org/x/mod/sumdb/dirhash"
-	modzip "golang.org/x/mod/zip"
 	"golang.org/x/sync/errgroup"
+	"software.sslmate.com/src/sourcespotter/gosum"
 )
 
 const (
@@ -198,24 +195,9 @@ func runAuthorize(tags []string) error {
 	group.SetLimit(runtime.GOMAXPROCS(0))
 	for i, tag := range tags {
 		group.Go(func() error {
-			subdir, version, err := parseTag(tag)
-			if err != nil {
-				return err
-			}
-			moduleDir := filepath.Join(repoRoot, subdir)
-			modulePath, err := modulePathFromFile(filepath.Join(moduleDir, "go.mod"))
-			if err != nil {
-				return err
-			}
-
-			zipHash, gomodHash, err := hashModuleZip(repoRoot, tag, subdir, modulePath, version)
-			if err != nil {
-				return err
-			}
-
-			goSumLines[i] = fmt.Sprintf("%s %s %s\n", modulePath, version, zipHash)
-			goSumLines[i] += fmt.Sprintf("%s %s/go.mod %s\n", modulePath, version, gomodHash)
-			return nil
+			var err error
+			goSumLines[i], err = gosum.CreateFromGitTag(repoRoot, tag)
+			return err
 		})
 	}
 	if err := group.Wait(); err != nil {
@@ -331,58 +313,6 @@ func gitRoot() (string, error) {
 		dir = parent
 	}
 	return "", errors.New("unable to locate .git directory: you must run this from within a Git repository")
-}
-
-func parseTag(tag string) (string, string, error) {
-	if tag == "" {
-		return "", "", errors.New("tag cannot be empty")
-	}
-	idx := strings.LastIndex(tag, "/")
-	if idx == -1 {
-		return "", tag, nil
-	}
-	subdir := tag[:idx]
-	version := tag[idx+1:]
-	if subdir == "" || version == "" {
-		return "", "", fmt.Errorf("invalid tag %q", tag)
-	}
-	return subdir, version, nil
-}
-
-func hashModuleZip(repoRoot, revision, subdir, modulePath, version string) (string, string, error) {
-	tempFile, err := os.CreateTemp("", "sourcespotter-authorize-*.zip")
-	if err != nil {
-		return "", "", err
-	}
-	defer os.Remove(tempFile.Name())
-	defer tempFile.Close()
-
-	modVersion := module.Version{Path: modulePath, Version: version}
-	if err := modzip.CreateFromVCS(tempFile, modVersion, repoRoot, revision, subdir); err != nil {
-		return "", "", err
-	}
-	if err := tempFile.Close(); err != nil {
-		return "", "", err
-	}
-	zipHash, err := dirhash.HashZip(tempFile.Name(), dirhash.Hash1)
-	if err != nil {
-		return "", "", err
-	}
-	gomodHash, err := hashGoMod(tempFile.Name(), modVersion, dirhash.Hash1)
-	if err != nil {
-		return "", "", err
-	}
-	return zipHash, gomodHash, nil
-}
-
-func hashGoMod(zipfile string, mod module.Version, hash dirhash.Hash) (string, error) {
-	z, err := zip.OpenReader(zipfile)
-	if err != nil {
-		return "", err
-	}
-	defer z.Close()
-	open := func(string) (io.ReadCloser, error) { return z.Open(mod.Path + "@" + mod.Version + "/go.mod") }
-	return hash([]string{"go.mod"}, open)
 }
 
 func postAuthorized(endpoint string, payload any) error {
