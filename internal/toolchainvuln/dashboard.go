@@ -58,19 +58,23 @@ func (v *vulnRow) GoIDString() string {
 }
 
 func (v *vulnRow) ReleasedAtString() string {
-	return v.ReleasedAt.UTC().Format("2006-01-02 15:04:05")
+	return v.ReleasedAt.UTC().Format("2006-01-02")
 }
 
 func (v *vulnRow) PublishedAtString() string {
 	if v.PublishedAt.Valid {
-		return v.PublishedAt.Time.UTC().Format("2006-01-02 15:04:05")
+		return v.PublishedAt.Time.UTC().Format("2006-01-02")
 	}
 	return ""
 }
 
+func (v *vulnRow) ReleaseSearchLink() string {
+	return fmt.Sprintf("https://groups.google.com/g/golang-announce/search?q=Go%%20%s%%20released", v.GoVersion)
+}
+
 func (v *vulnRow) TimeSinceRelease() string {
-	duration := time.Since(v.ReleasedAt)
-	return formatDuration(duration)
+	days := int(time.Since(v.ReleasedAt).Hours() / 24)
+	return formatDays(days)
 }
 
 func (v *vulnRow) LagTime() string {
@@ -82,25 +86,15 @@ func (v *vulnRow) LagTime() string {
 		// Published before release (already in vuln db)
 		return "pre-release"
 	}
-	return formatDuration(duration)
+	days := int(duration.Hours() / 24)
+	return formatDays(days)
 }
 
-func formatDuration(d time.Duration) string {
-	if d < 0 {
-		d = -d
+func formatDays(days int) string {
+	if days == 1 {
+		return "1 day"
 	}
-
-	days := int(d.Hours() / 24)
-	hours := int(d.Hours()) % 24
-	minutes := int(d.Minutes()) % 60
-
-	if days > 0 {
-		return fmt.Sprintf("%dd %dh %dm", days, hours, minutes)
-	}
-	if hours > 0 {
-		return fmt.Sprintf("%dh %dm", hours, minutes)
-	}
-	return fmt.Sprintf("%dm", minutes)
+	return fmt.Sprintf("%d days", days)
 }
 
 func (v *vulnRow) CVELink() string {
@@ -145,7 +139,7 @@ func loadDashboard(ctx context.Context) (*dashboard, error) {
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dash.Vulns,
 		`SELECT goversion, cveid, released_at, goid, published_at
 		 FROM toolchain_vuln
-		 ORDER BY released_at DESC, goversion DESC, cveid`); err != nil {
+		 ORDER BY released_at ASC, goversion ASC, cveid`); err != nil {
 		return nil, err
 	}
 

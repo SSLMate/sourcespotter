@@ -19,16 +19,16 @@
 				<tr>
 					<th>Go Version</th>
 					<th>CVE ID</th>
-					<th>Released At (UTC)</th>
+					<th>Released</th>
 					<th>GO ID</th>
-					<th>Published At (UTC)</th>
+					<th>Published</th>
 					<th>Lag / Pending</th>
 				</tr>
 			</thead>
 			<tbody>
 				{{ range .Vulns }}
 				<tr{{ if not .IsPublished }} class="unpublished"{{ end }}>
-					<td>{{ .GoVersion }}</td>
+					<td><a href="{{ .ReleaseSearchLink }}">{{ .GoVersion }}</a></td>
 					<td><a href="{{ .CVELink }}">{{ .CVEID }}</a></td>
 					<td>{{ .ReleasedAtString }}</td>
 					<td>
