@@ -102,7 +102,7 @@ func (v *vulnRow) CVELink() string {
 }
 
 func (v *vulnRow) CVEVulnDBSearchLink() string {
-	return fmt.Sprintf("https://pkg.go.dev/vuln/list?q=%s", v.CVEID)
+	return fmt.Sprintf("https://pkg.go.dev/search?q=%s&m=vuln", v.CVEID)
 }
 
 func (v *vulnRow) GoVulnLink() string {
