@@ -34,12 +34,13 @@ import (
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/deps"
 	"software.sslmate.com/src/sourcespotter/internal/modcheck"
-	"software.sslmate.com/src/sourcespotter/internal/vulns"
 	"software.sslmate.com/src/sourcespotter/internal/modules"
 	"software.sslmate.com/src/sourcespotter/internal/sths"
 	"software.sslmate.com/src/sourcespotter/internal/sumdb"
 	"software.sslmate.com/src/sourcespotter/internal/telemetry"
 	"software.sslmate.com/src/sourcespotter/internal/toolchain"
+	"software.sslmate.com/src/sourcespotter/internal/toolchainvuln"
+	"software.sslmate.com/src/sourcespotter/internal/vulns"
 	"src.agwa.name/go-util/logfilter"
 )
 
@@ -57,6 +58,9 @@ func newHTTPServer() *http.Server {
 	mux.HandleFunc("GET "+domain+"/toolchain/{$}", toolchain.ServeDashboard)
 	mux.HandleFunc("GET "+domain+"/telemetry/{$}", telemetry.ServeDashboard)
 	mux.HandleFunc("GET "+domain+"/modcheck/{$}", modcheck.ServeDashboard)
+	mux.HandleFunc("GET "+domain+"/toolchainvuln/{$}", toolchainvuln.ServeDashboard)
+	// v1 internal API
+	mux.HandleFunc("POST v1.api."+domain+"/toolchainvuln/announcement", toolchainvuln.ReceiveAnnouncement)
 	// badges API
 	mux.HandleFunc("GET badges.api."+domain+"/deps", deps.ServeBadge)
 	// feeds API

@@ -143,6 +143,8 @@ func main() {
 		go refreshTelemetryCounters()
 	}
 
+	go syncToolchainVulns()
+
 	select {}
 }
 

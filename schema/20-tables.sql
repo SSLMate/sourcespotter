@@ -134,4 +134,14 @@ CREATE TABLE dep_count_cache (
 	PRIMARY KEY (query)
 );
 
+CREATE TABLE toolchain_vuln (
+	goversion	text NOT NULL,
+	cveid		text NOT NULL,
+	released_at	timestamptz NOT NULL,
+	goid		text,
+	published_at	timestamptz,
+
+	PRIMARY KEY (goversion, cveid)
+);
+
 COMMIT;
