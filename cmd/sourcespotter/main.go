@@ -41,6 +41,7 @@ import (
 	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/toolchain"
+	"software.sslmate.com/src/sourcespotter/internal/toolchainvuln"
 	"src.agwa.name/go-listener"
 	_ "src.agwa.name/go-listener/tls"
 )
@@ -85,6 +86,9 @@ func main() {
 			LambdaArch         string
 			LambdaFunc         string
 		}
+		ToolchainVuln struct {
+			AnnouncementPassword string
+		}
 	}
 	if err := json.Unmarshal(configData, &cfg); err != nil {
 		log.Fatal(err)
@@ -118,6 +122,7 @@ func main() {
 	toolchain.BootstrapHash = cfg.Toolchain.BootstrapHash
 	toolchain.LambdaArch = cfg.Toolchain.LambdaArch
 	toolchain.LambdaFunc = cfg.Toolchain.LambdaFunc
+	toolchainvuln.AnnouncementPassword = cfg.ToolchainVuln.AnnouncementPassword
 
 	if listen := slices.Concat(cfg.Listen, flags.listen); len(listen) > 0 {
 		listeners, err := listener.OpenAll(listen)

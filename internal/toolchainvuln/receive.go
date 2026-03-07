@@ -27,6 +27,7 @@ package toolchainvuln
 
 import (
 	"context"
+	"crypto/subtle"
 	"fmt"
 	"io"
 	"log"
@@ -37,6 +38,10 @@ import (
 
 	"software.sslmate.com/src/sourcespotter"
 )
+
+// AnnouncementPassword is the password required to POST announcements.
+// Set from config file. If empty, the endpoint is disabled.
+var AnnouncementPassword string
 
 var (
 	// Match Go version patterns like "Go 1.25.6" or "Go 1.24.12"
@@ -82,6 +87,19 @@ func InsertToolchainVuln(ctx context.Context, goVersion, cveID string, releasedA
 func ReceiveAnnouncement(w http.ResponseWriter, req *http.Request) {
 	if req.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Check authentication
+	if AnnouncementPassword == "" {
+		http.Error(w, "Endpoint not configured", http.StatusServiceUnavailable)
+		return
+	}
+
+	_, password, ok := req.BasicAuth()
+	if !ok || subtle.ConstantTimeCompare([]byte(password), []byte(AnnouncementPassword)) != 1 {
+		w.Header().Set("WWW-Authenticate", `Basic realm="toolchainvuln"`)      
+		http.Error(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
 
