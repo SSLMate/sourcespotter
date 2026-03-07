@@ -101,6 +101,10 @@ func (v *vulnRow) CVELink() string {
 	return fmt.Sprintf("https://www.cve.org/CVERecord?id=%s", v.CVEID)
 }
 
+func (v *vulnRow) CVEVulnDBSearchLink() string {
+	return fmt.Sprintf("https://pkg.go.dev/vuln/list?q=%s", v.CVEID)
+}
+
 func (v *vulnRow) GoVulnLink() string {
 	if v.GoID.Valid {
 		return fmt.Sprintf("https://pkg.go.dev/vuln/%s", v.GoID.String)

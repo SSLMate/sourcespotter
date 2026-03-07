@@ -19,8 +19,8 @@
 				<tr>
 					<th>Go Version</th>
 					<th>CVE ID</th>
-					<th>Released</th>
 					<th>GO ID</th>
+					<th>Released</th>
 					<th>Published</th>
 					<th>Lag / Pending</th>
 				</tr>
@@ -29,8 +29,7 @@
 				{{ range .Vulns }}
 				<tr{{ if not .IsPublished }} class="unpublished"{{ end }}>
 					<td><a href="{{ .ReleaseSearchLink }}">{{ .GoVersion }}</a></td>
-					<td><a href="{{ .CVELink }}">{{ .CVEID }}</a></td>
-					<td>{{ .ReleasedAtString }}</td>
+					<td><a href="{{ .CVEVulnDBSearchLink }}">{{ .CVEID }}</a></td>
 					<td>
 						{{ if .IsPublished }}
 						<a href="{{ .GoVulnLink }}">{{ .GoIDString }}</a>
@@ -38,6 +37,7 @@
 						<em>pending</em>
 						{{ end }}
 					</td>
+					<td>{{ .ReleasedAtString }}</td>
 					<td>{{ .PublishedAtString }}</td>
 					<td>
 						{{ if .IsPublished }}
