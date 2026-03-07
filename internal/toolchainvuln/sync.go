@@ -28,10 +28,13 @@ package toolchainvuln
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
+	"sync"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/httpclient"
 	"src.agwa.name/go-dbutil"
@@ -44,6 +47,12 @@ type VulnEntry struct {
 	ID       string   `json:"id"`
 	Modified string   `json:"modified"`
 	Aliases  []string `json:"aliases"`
+}
+
+// VulnRecord represents the full vulnerability record from vuln.go.dev.
+type VulnRecord struct {
+	ID        string `json:"id"`
+	Published string `json:"published"`
 }
 
 // UnpublishedVuln represents a toolchain_vuln row with null goid.
@@ -67,29 +76,30 @@ func FetchVulnIndex(ctx context.Context) ([]VulnEntry, error) {
 	return entries, nil
 }
 
-// BuildCVEToGoIDMap creates a map from CVE ID to (GO ID, modified time).
-func BuildCVEToGoIDMap(entries []VulnEntry) map[string]struct {
-	GoID     string
-	Modified time.Time
-} {
-	result := make(map[string]struct {
-		GoID     string
-		Modified time.Time
-	})
+// FetchVulnRecord downloads and parses a specific vulnerability record.
+func FetchVulnRecord(ctx context.Context, goID string) (*VulnRecord, error) {
+	url := fmt.Sprintf("https://vuln.go.dev/ID/%s.json", goID)
+	data, err := httpclient.DownloadBytes(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+
+	var record VulnRecord
+	if err := json.Unmarshal(data, &record); err != nil {
+		return nil, err
+	}
+
+	return &record, nil
+}
+
+// BuildCVEToGoIDMap creates a map from CVE ID to GO ID.
+func BuildCVEToGoIDMap(entries []VulnEntry) map[string]string {
+	result := make(map[string]string)
 
 	for _, entry := range entries {
-		modified, err := time.Parse(time.RFC3339, entry.Modified)
-		if err != nil {
-			// Skip entries with invalid timestamps
-			continue
-		}
-
 		for _, alias := range entry.Aliases {
 			if strings.HasPrefix(alias, "CVE-") {
-				result[alias] = struct {
-					GoID     string
-					Modified time.Time
-				}{GoID: entry.ID, Modified: modified}
+				result[alias] = entry.ID
 			}
 		}
 	}
@@ -121,21 +131,75 @@ func SyncVulnDatabase(ctx context.Context) error {
 
 	cveMap := BuildCVEToGoIDMap(entries)
 
+	// Find which GO IDs we need to fetch
+	goIDsToFetch := make(map[string]bool)
+	for _, vuln := range unpublished {
+		if goID, ok := cveMap[vuln.CVEID]; ok {
+			goIDsToFetch[goID] = true
+		}
+	}
+
+	if len(goIDsToFetch) == 0 {
+		log.Printf("no matching GO IDs found in vuln.go.dev")
+		return nil
+	}
+
+	// Fetch published times for each GO ID (up to 10 in parallel)
+	publishedTimes := make(map[string]time.Time)
+	var mu sync.Mutex
+
+	g, gctx := errgroup.WithContext(ctx)
+	g.SetLimit(10)
+
+	for goID := range goIDsToFetch {
+		goID := goID // capture for goroutine
+		g.Go(func() error {
+			record, err := FetchVulnRecord(gctx, goID)
+			if err != nil {
+				log.Printf("error fetching %s: %v", goID, err)
+				return nil // don't fail the whole sync
+			}
+
+			published, err := time.Parse(time.RFC3339, record.Published)
+			if err != nil {
+				log.Printf("error parsing published time for %s: %v", goID, err)
+				return nil
+			}
+
+			mu.Lock()
+			publishedTimes[goID] = published
+			mu.Unlock()
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return err
+	}
+
 	// Update any that are now published
 	updated := 0
 	for _, vuln := range unpublished {
-		if info, ok := cveMap[vuln.CVEID]; ok {
-			_, err := sourcespotter.DB.ExecContext(ctx,
-				`UPDATE toolchain_vuln SET goid = $1, published_at = $2
-				 WHERE goversion = $3 AND cveid = $4`,
-				info.GoID, info.Modified, vuln.GoVersion, vuln.CVEID)
-			if err != nil {
-				return err
-			}
-			log.Printf("updated %s/%s with GO ID %s (published %s)",
-				vuln.GoVersion, vuln.CVEID, info.GoID, info.Modified.Format(time.RFC3339))
-			updated++
+		goID, ok := cveMap[vuln.CVEID]
+		if !ok {
+			continue
 		}
+
+		published, ok := publishedTimes[goID]
+		if !ok {
+			continue
+		}
+
+		_, err := sourcespotter.DB.ExecContext(ctx,
+			`UPDATE toolchain_vuln SET goid = $1, published_at = $2
+			 WHERE goversion = $3 AND cveid = $4`,
+			goID, published, vuln.GoVersion, vuln.CVEID)
+		if err != nil {
+			return err
+		}
+		log.Printf("updated %s/%s with GO ID %s (published %s)",
+			vuln.GoVersion, vuln.CVEID, goID, published.Format(time.RFC3339))
+		updated++
 	}
 
 	log.Printf("updated %d toolchain vulns with GO IDs", updated)
