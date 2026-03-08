@@ -98,10 +98,6 @@ func formatDays(days int) string {
 }
 
 func (v *vulnRow) CVELink() string {
-	return fmt.Sprintf("https://www.cve.org/CVERecord?id=%s", v.CVEID)
-}
-
-func (v *vulnRow) CVEVulnDBSearchLink() string {
 	return fmt.Sprintf("https://pkg.go.dev/search?q=%s&m=vuln", v.CVEID)
 }
 

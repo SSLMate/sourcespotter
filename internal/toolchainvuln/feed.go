@@ -44,7 +44,7 @@ type unpublishedVulnRow struct {
 }
 
 func (v *unpublishedVulnRow) CVELink() string {
-	return fmt.Sprintf("https://www.cve.org/CVERecord?id=%s", v.CVEID)
+	return fmt.Sprintf("https://pkg.go.dev/search?q=%s&m=vuln", v.CVEID)
 }
 
 func (v *unpublishedVulnRow) ReleaseSearchLink() string {

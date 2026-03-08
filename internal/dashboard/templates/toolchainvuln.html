@@ -36,7 +36,7 @@
 				{{ range .Vulns }}
 				<tr{{ if not .IsPublished }} class="unpublished"{{ end }}>
 					<td><a href="{{ .ReleaseSearchLink }}">{{ .GoVersion }}</a></td>
-					<td><a href="{{ .CVEVulnDBSearchLink }}">{{ .CVEID }}</a></td>
+					<td><a href="{{ .CVELink }}">{{ .CVEID }}</a></td>
 					<td>
 						{{ if .IsPublished }}
 						<a href="{{ .GoVulnLink }}">{{ .GoIDString }}</a>
