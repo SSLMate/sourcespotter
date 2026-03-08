@@ -51,7 +51,7 @@ func (v *unpublishedVulnRow) ReleaseSearchLink() string {
 	return fmt.Sprintf("https://groups.google.com/g/golang-announce/search?q=Go%%20%s%%20released", v.GoVersion)
 }
 
-const defaultMinAge = 24 * time.Hour
+const defaultMinAge time.Duration = 0
 
 // ServeUnpublishedAtom publishes an Atom feed of toolchain vulnerabilities
 // that have been released for more than a specified duration but are not yet published to vuln.go.dev.
