@@ -83,10 +83,14 @@ func ServeUnpublishedAtom(w http.ResponseWriter, req *http.Request) {
 	}
 
 	feedURL := "https://feeds.api." + sourcespotter.Domain + "/toolchainvuln/unpublished.atom?min_age=" + minAge.String()
+	feedTitle := "Unpublished Go Toolchain Vulnerabilities"
+	if minAge > 0 {
+		feedTitle += fmt.Sprintf(" (>%s)", minAge)
+	}
 	feed := atom.Feed{
 		Xmlns:  "http://www.w3.org/2005/Atom",
 		ID:     feedURL,
-		Title:  "Unpublished Go Toolchain Vulnerabilities",
+		Title:  feedTitle,
 		Author: atom.Person{Name: "Source Spotter on " + sourcespotter.Domain},
 		Link:   atom.Link{Rel: "self", Href: feedURL},
 	}
