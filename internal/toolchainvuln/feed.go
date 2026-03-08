@@ -51,10 +51,23 @@ func (v *unpublishedVulnRow) ReleaseSearchLink() string {
 	return fmt.Sprintf("https://groups.google.com/g/golang-announce/search?q=Go%%20%s%%20released", v.GoVersion)
 }
 
+const defaultMinAge = 24 * time.Hour
+
 // ServeUnpublishedAtom publishes an Atom feed of toolchain vulnerabilities
-// that have been released for more than 24 hours but are not yet published to vuln.go.dev.
+// that have been released for more than a specified duration but are not yet published to vuln.go.dev.
+// The minimum age can be specified via the "min_age" query parameter (default: 24h).
 func ServeUnpublishedAtom(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
+
+	minAge := defaultMinAge
+	if minAgeParam := req.URL.Query().Get("min_age"); minAgeParam != "" {
+		var err error
+		minAge, err = time.ParseDuration(minAgeParam)
+		if err != nil {
+			http.Error(w, "Invalid min_age parameter: "+err.Error(), http.StatusBadRequest)
+			return
+		}
+	}
 
 	var rows []unpublishedVulnRow
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &rows,
@@ -63,13 +76,13 @@ func ServeUnpublishedAtom(w http.ResponseWriter, req *http.Request) {
 		 WHERE goid IS NULL
 		   AND released_at < $1
 		 ORDER BY released_at ASC, goversion ASC, cveid`,
-		time.Now().Add(-24*time.Hour)); err != nil {
+		time.Now().Add(-minAge)); err != nil {
 		log.Printf("error querying unpublished toolchain vulns: %s", err)
 		http.Error(w, "Internal Database Error", http.StatusInternalServerError)
 		return
 	}
 
-	feedURL := "https://feeds.api." + sourcespotter.Domain + "/toolchainvuln/unpublished.atom"
+	feedURL := "https://feeds.api." + sourcespotter.Domain + "/toolchainvuln/unpublished.atom?min_age=" + minAge.String()
 	feed := atom.Feed{
 		Xmlns:  "http://www.w3.org/2005/Atom",
 		ID:     feedURL,
