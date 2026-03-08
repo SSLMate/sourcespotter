@@ -71,6 +71,7 @@ func newHTTPServer() *http.Server {
 	mux.HandleFunc("GET feeds.api."+domain+"/telemetry/counters.atom", telemetry.ServeCountersAtom)
 	mux.HandleFunc("GET feeds.api."+domain+"/telemetry/counters.csv", telemetry.ServeCountersCSV)
 	mux.HandleFunc("GET feeds.api."+domain+"/modules/versions.atom", modules.ServeVersionsAtom)
+	mux.HandleFunc("GET feeds.api."+domain+"/toolchainvuln/unpublished.atom", toolchainvuln.ServeUnpublishedAtom)
 	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
