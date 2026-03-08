@@ -51,8 +51,30 @@ type VulnEntry struct {
 
 // VulnRecord represents the full vulnerability record from vuln.go.dev.
 type VulnRecord struct {
-	ID        string `json:"id"`
-	Published string `json:"published"`
+	ID        string           `json:"id"`
+	Published string           `json:"published"`
+	Affected  []AffectedEntry  `json:"affected"`
+}
+
+// AffectedEntry represents an affected package in a vulnerability record.
+type AffectedEntry struct {
+	Package AffectedPackage `json:"package"`
+}
+
+// AffectedPackage represents a package reference in an affected entry.
+type AffectedPackage struct {
+	Name      string `json:"name"`
+	Ecosystem string `json:"ecosystem"`
+}
+
+// AffectsToolchain returns true if the vulnerability affects stdlib or toolchain.
+func (r *VulnRecord) AffectsToolchain() bool {
+	for _, a := range r.Affected {
+		if a.Package.Name == "stdlib" || a.Package.Name == "toolchain" {
+			return true
+		}
+	}
+	return false
 }
 
 // UnpublishedVuln represents a toolchain_vuln row with null goid.
@@ -158,6 +180,12 @@ func SyncVulnDatabase(ctx context.Context) error {
 			if err != nil {
 				log.Printf("error fetching %s: %v", goID, err)
 				return nil // don't fail the whole sync
+			}
+
+			// Only consider vulnerabilities that actually affect stdlib or toolchain
+			if !record.AffectsToolchain() {
+				log.Printf("%s does not affect stdlib or toolchain, skipping", goID)
+				return nil
 			}
 
 			published, err := time.Parse(time.RFC3339, record.Published)
