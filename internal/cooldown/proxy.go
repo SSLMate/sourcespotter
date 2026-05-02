@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -90,18 +91,30 @@ func serveList(ctx context.Context, w http.ResponseWriter, modulePath goproxy.Mo
 	}
 }
 
+func parseDuration(s string) (time.Duration, error) {
+	s, ok := strings.CutSuffix(s, "d")
+	if !ok {
+		return 0, fmt.Errorf(`does not have "d" suffix`)
+	}
+	n, err := strconv.ParseUint(s, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return time.Duration(n) * 24 * time.Hour, nil
+}
+
 func Serve(w http.ResponseWriter, httpReq *http.Request) {
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 
 	path := strings.TrimPrefix(httpReq.URL.Path, "/")
 	duration, path, ok := strings.Cut(path, "/")
 	if !ok {
-		http.Error(w, `Path does not start with /DURATION/ (e.g. "/24h/")`, http.StatusBadRequest)
+		http.Error(w, `Path does not start with /DURATION/ (e.g. "/7d/")`, http.StatusBadRequest)
 		return
 	}
-	minAge, err := time.ParseDuration(duration)
+	minAge, err := parseDuration(duration)
 	if err != nil {
-		http.Error(w, `Path does not start with a valid duration (e.g. "/24h/"): `+err.Error(), http.StatusBadRequest)
+		http.Error(w, `Path does not start with a valid duration (e.g. "/7d/"): `+err.Error(), http.StatusBadRequest)
 		return
 	}
 	if strings.HasPrefix(path, "sumdb/") {
