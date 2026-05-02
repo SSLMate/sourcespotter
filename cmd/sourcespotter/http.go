@@ -31,6 +31,7 @@ import (
 	"time"
 
 	"software.sslmate.com/src/sourcespotter"
+	"software.sslmate.com/src/sourcespotter/internal/cooldown"
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
 	"software.sslmate.com/src/sourcespotter/internal/deps"
 	"software.sslmate.com/src/sourcespotter/internal/modcheck"
@@ -75,6 +76,8 @@ func newHTTPServer() *http.Server {
 	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
+	// cooldown API
+	mux.HandleFunc("GET cooldown.api."+domain+"/", cooldown.Serve)
 	// v1 public API
 	mux.HandleFunc("POST v1.api."+domain+"/modules/authorized", modules.ReceiveAuthorized)
 	mux.HandleFunc("GET v1.api."+domain+"/modules/authorized", modules.ServeAuthorized)
