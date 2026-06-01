@@ -106,7 +106,7 @@ func ReceiveGossip(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.WriteHeader(200)
 	if !consistent.Valid {
-		fmt.Fprintf(w, "pending: we don't know yet if this STH is consistent with other STHs that we've seen from %s; we have have saved this STH and will audit it ASAP\n", address)
+		fmt.Fprintf(w, "pending: we don't know yet if this STH is consistent with other STHs that we've seen from %s; we have saved this STH and will audit it ASAP\n", address)
 	} else if consistent.Bool {
 		fmt.Fprintf(w, "consistent: this STH is consistent with other STHs that we've seen from %s\n", address)
 	} else {
