@@ -105,15 +105,6 @@ func AuditAll(ctx context.Context) error {
 	return g.Wait()
 }
 
-// Audit checks that the building the given toolchain results in the checksum published in the sumdb
-func Audit(ctx context.Context, modversion string) error {
-	var sha256 []byte
-	if err := sourcespotter.DB.QueryRowContext(ctx, `SELECT source_sha256 FROM record WHERE module = 'golang.org/toolchain' AND version = $1`, modversion).Scan(&sha256); err != nil {
-		return err
-	}
-	return audit(ctx, modversion, formatHash1(sha256))
-}
-
 // audit checks that the building the given toolchain results in the given checksum
 func audit(ctx context.Context, modversion string, expectedHash string) error {
 	if strings.HasPrefix(modversion, "v0.0.1-go1.9.2rc2.") {
