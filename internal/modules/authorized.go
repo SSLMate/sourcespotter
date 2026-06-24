@@ -48,6 +48,10 @@ func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid JSON: trailing data", http.StatusBadRequest)
 		return
 	}
+	if len(body.Ed25519) != ed25519.PublicKeySize {
+		http.Error(w, "Invalid ed25519 public key: wrong length", http.StatusBadRequest)
+		return
+	}
 	if !ed25519.Verify(body.Ed25519, []byte(body.GoSum), body.Signature) {
 		http.Error(w, "Permission Denied: signature validation failed", http.StatusForbidden)
 		return
