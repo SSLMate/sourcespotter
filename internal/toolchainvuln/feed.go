@@ -53,9 +53,6 @@ func (v *unpublishedVulnRow) ReleaseSearchLink() string {
 
 const defaultMinAge time.Duration = 0
 
-// ServeUnpublishedAtom publishes an Atom feed of toolchain vulnerabilities
-// that have been released for more than a specified duration but are not yet published to vuln.go.dev.
-// The minimum age can be specified via the "min_age" query parameter (default: 24h).
 func ServeUnpublishedAtom(w http.ResponseWriter, req *http.Request) {
 	ctx := req.Context()
 
