@@ -62,8 +62,16 @@ func ParseModVersion(modversion string) (Version, bool) {
 	if !version.IsValid(gover) {
 		return Version{}, false
 	}
+	if strings.Contains(gover, "-") {
+		// reject custom version suffixes; they can smuggle unsafe characters and we don't
+		// know how to handle custom versions anyways
+		return Version{}, false
+	}
 	goos, goarch, ok := strings.Cut(modversion[lastdot+1:], "-")
 	if !ok {
+		return Version{}, false
+	}
+	if !isValidArchOrOS(goos) || !isValidArchOrOS(goarch) {
 		return Version{}, false
 	}
 	return Version{
@@ -71,4 +79,22 @@ func ParseModVersion(modversion string) (Version, bool) {
 		GOOS:      goos,
 		GOARCH:    goarch,
 	}, true
+}
+
+func isValidArchOrOS(s string) bool {
+	// Ensure the string can't be used to smuggle path separators, whitespace, control
+	// characters, etc. into filenames, URLs, and S3 object keys built from them.
+	if s == "" {
+		return false
+	}
+	for _, r := range s {
+		switch {
+		case r >= 'A' && r <= 'Z':
+		case r >= 'a' && r <= 'z':
+		case r >= '0' && r <= '9':
+		default:
+			return false
+		}
+	}
+	return true
 }
