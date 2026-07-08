@@ -37,6 +37,7 @@ import (
 	"go/version"
 	"io"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path"
@@ -102,14 +103,24 @@ func handler(ctx context.Context, event toolchainlambda.Event) error {
 	if err := cmd.Run(); err != nil {
 		errs = append(errs, fmt.Errorf("build failed: %w", err))
 	} else if err := httpclient.UploadFile(ctx, event.ZipUploadURL, toolchainlambda.ZipContentType, zipfile); err != nil {
-		errs = append(errs, fmt.Errorf("uploading zip failed: %w", err))
+		errs = append(errs, fmt.Errorf("uploading zip failed: %w", redactURLError(err)))
 	}
 
 	if err := httpclient.Upload(ctx, event.LogUploadURL, toolchainlambda.LogContentType, &logBuf); err != nil {
-		errs = append(errs, fmt.Errorf("uploading log failed: %w", err))
+		errs = append(errs, fmt.Errorf("uploading log failed: %w", redactURLError(err)))
 	}
 
 	return errors.Join(errs...)
+}
+
+func redactURLError(err error) error {
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		if i := strings.IndexByte(urlErr.URL, '?'); i >= 0 {
+			urlErr.URL = urlErr.URL[:i+1] + "REDACTED"
+		}
+	}
+	return err
 }
 
 func downloadSource(ctx context.Context, destdir string, tgzURL string) error {
