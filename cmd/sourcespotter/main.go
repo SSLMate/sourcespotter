@@ -120,7 +120,7 @@ func main() {
 			o.ExpiryWindow = 5*time.Minute + toolchain.PresignExpires
 			o.ExpiryWindowJitterFrac = 0.0
 		}),
-	); err != nil {
+	); err == nil {
 		toolchain.AWSConfig = awsCfg
 	} else {
 		log.Fatal(err)
