@@ -35,6 +35,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
+const PresignExpires = 30 * time.Minute
+
 var (
 	AWSConfig  aws.Config
 	Bucket     string
@@ -59,7 +61,7 @@ func presignPutObject(ctx context.Context, objectName string, contentType string
 		Bucket:      aws.String(Bucket),
 		Key:         aws.String(objectName),
 		ContentType: aws.String(contentType),
-	}, s3.WithPresignExpires(30*time.Minute))
+	}, s3.WithPresignExpires(PresignExpires))
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +73,7 @@ func presignGetObject(ctx context.Context, objectName string) (string, error) {
 	presigned, err := presigner.PresignGetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(Bucket),
 		Key:    aws.String(objectName),
-	}, s3.WithPresignExpires(30*time.Minute))
+	}, s3.WithPresignExpires(PresignExpires))
 	if err != nil {
 		return "", err
 	}

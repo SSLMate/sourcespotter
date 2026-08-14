@@ -37,6 +37,7 @@ import (
 	"slices"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/internal/dashboard"
@@ -112,7 +113,14 @@ func main() {
 		dashboard.Files = os.DirFS(flags.files)
 	}
 
-	if awsCfg, err := config.LoadDefaultConfig(context.Background()); err == nil {
+	if awsCfg, err := config.LoadDefaultConfig(
+		context.Background(),
+		config.WithCredentialsCacheOptions(func(o *aws.CredentialsCacheOptions) {
+			// Make sure credentials don't expire before pre-signed S3 URLs
+			o.ExpiryWindow = 5*time.Minute + toolchain.PresignExpires
+			o.ExpiryWindowJitterFrac = 0.0
+		}),
+	); err != nil {
 		toolchain.AWSConfig = awsCfg
 	} else {
 		log.Fatal(err)
