@@ -51,11 +51,11 @@ func getModfetch(w http.ResponseWriter, req *http.Request) error {
 	var moduleObject struct {
 		Path     string
 		Version  string
-		Error    string `json:",omitempty"`
-		Info     any    `json:",omitempty"`
-		GoMod    string `json:",omitempty"`
-		Sum      string `json:",omitempty"`
-		GoModSum string `json:",omitempty"`
+		Error    string `json:",omitzero"`
+		Info     any    `json:",omitzero"`
+		GoMod    string `json:",omitzero"`
+		Sum      string `json:",omitzero"`
+		GoModSum string `json:",omitzero"`
 	}
 	if err := json.Unmarshal(out, &moduleObject); err != nil && execErr == nil {
 		return fmt.Errorf("error unmarshalling JSON from 'go mod download': %w", err)
