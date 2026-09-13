@@ -68,6 +68,8 @@ CREATE INDEX record_module ON record (module, version, db_id, position DESC);
 CREATE INDEX duplicate_module ON record (db_id) WHERE previous_position IS NOT NULL;
 
 CREATE TABLE authorized_record (
+        -- pubkey is type-prefixed: \x00 followed by an ed25519 public key,
+        -- or \x01 followed by the SHA-256 hash of an ML-DSA public key
         pubkey          bytea NOT NULL,
         module          text NOT NULL,
         version         text NOT NULL,

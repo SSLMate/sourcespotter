@@ -2,7 +2,6 @@ package modules
 
 import (
 	"bufio"
-	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -35,6 +34,7 @@ func parseHash(input string) ([]byte, error) {
 
 func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 	var body struct {
+		MLDSA     []byte
 		Ed25519   []byte
 		GoSum     string
 		Signature []byte
@@ -48,11 +48,12 @@ func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Invalid JSON: trailing data", http.StatusBadRequest)
 		return
 	}
-	if len(body.Ed25519) != ed25519.PublicKeySize {
-		http.Error(w, "Invalid ed25519 public key: wrong length", http.StatusBadRequest)
+	pubkey, verify, err := parseRequestPubkey(body.MLDSA, body.Ed25519)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if !ed25519.Verify(body.Ed25519, []byte(body.GoSum), body.Signature) {
+	if !verify([]byte(body.GoSum), body.Signature) {
 		http.Error(w, "Permission Denied: signature validation failed", http.StatusForbidden)
 		return
 	}
@@ -87,7 +88,7 @@ func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 			columnName = "gomod_sha256"
 			version = s
 		}
-		if _, err := tx.ExecContext(req.Context(), `INSERT INTO authorized_record (pubkey, module, version, `+columnName+`) VALUES ($1,$2,$3,$4) ON CONFLICT (pubkey,module,version) DO UPDATE SET `+columnName+`=excluded.`+columnName, body.Ed25519, module, version, hash); err != nil {
+		if _, err := tx.ExecContext(req.Context(), `INSERT INTO authorized_record (pubkey, module, version, `+columnName+`) VALUES ($1,$2,$3,$4) ON CONFLICT (pubkey,module,version) DO UPDATE SET `+columnName+`=excluded.`+columnName, pubkey, module, version, hash); err != nil {
 			log.Print(err)
 			http.Error(w, "Internal Database Error", http.StatusInternalServerError)
 			return
@@ -106,18 +107,13 @@ func ReceiveAuthorized(w http.ResponseWriter, req *http.Request) {
 }
 
 func ServeAuthorized(w http.ResponseWriter, req *http.Request) {
-	pubkeyParam := req.URL.Query().Get("ed25519")
-	if pubkeyParam == "" {
-		http.Error(w, "Missing ed25519 parameter", http.StatusBadRequest)
-		return
-	}
-	pubkey, err := base64.StdEncoding.DecodeString(pubkeyParam)
+	pubkey, err := parsePubkeyParam(req.URL.Query())
 	if err != nil {
-		http.Error(w, "Invalid ed25519 parameter: invalid base64", http.StatusBadRequest)
+		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	if len(pubkey) != ed25519.PublicKeySize {
-		http.Error(w, "Invalid ed25519 parameter: wrong length", http.StatusBadRequest)
+	if pubkey == nil {
+		http.Error(w, "Missing mldsa parameter", http.StatusBadRequest)
 		return
 	}
 

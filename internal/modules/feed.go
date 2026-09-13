@@ -1,7 +1,6 @@
 package modules
 
 import (
-	"crypto/ed25519"
 	"encoding/base64"
 	"encoding/xml"
 	"fmt"
@@ -34,19 +33,10 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 		http.Error(w, "Missing module parameter", http.StatusBadRequest)
 		return
 	}
-	pubkeyParam := req.URL.Query().Get("ed25519")
-	var pubkey []byte
-	var err error
-	if pubkeyParam != "" {
-		pubkey, err = base64.StdEncoding.DecodeString(pubkeyParam)
-		if err != nil {
-			http.Error(w, "Invalid ed25519 parameter: invalid base64", http.StatusBadRequest)
-			return
-		}
-		if len(pubkey) != ed25519.PublicKeySize {
-			http.Error(w, "Invalid ed25519 parameter: wrong length", http.StatusBadRequest)
-			return
-		}
+	pubkey, err := parsePubkeyParam(req.URL.Query())
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
 	ctx := req.Context()
@@ -78,8 +68,10 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 	u, _ := url.Parse(baseURL)
 	q := u.Query()
 	q.Set("module", module)
-	if pubkeyParam != "" {
-		q.Set("ed25519", pubkeyParam)
+	for _, param := range []string{"mldsa", "ed25519"} {
+		if value := req.URL.Query().Get(param); value != "" {
+			q.Set(param, value)
+		}
 	}
 	u.RawQuery = q.Encode()
 	feedURL := u.String()

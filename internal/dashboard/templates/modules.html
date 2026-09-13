@@ -26,8 +26,8 @@
                 <ul>
                         <li><code>module</code> (required) &ndash; the module path to inspect. Append a trailing slash (<code>/</code>)
                                 to match all modules with the given prefix.</li>
-                        <li><code>ed25519</code> (optional) &ndash; a base64-encoded public key. When supplied, the feed only returns
-                                versions that have <strong>not</strong> been authorized by that key (see below).</li>
+                        <li><code>mldsa</code> (optional) &ndash; the hex-encoded SHA-256 hash of an ML-DSA public key. When supplied,
+                                the feed only returns versions that have <strong>not</strong> been authorized by that key (see below).</li>
                 </ul>
 
                 <p>
@@ -40,7 +40,7 @@
         <section>
                 <h2>Try It Out</h2>
 
-                <p>Enter the module path and optional Ed25519 public key to open the feed.</p>
+                <p>Enter the module path and optional ML-DSA public key hash to open the feed.</p>
 
                 <form class="feed-form" action="https://feeds.api.{{ $.Domain }}/modules/versions.atom" method="get">
                         <div>
@@ -48,8 +48,8 @@
                                 <input id="module" name="module" type="text" required placeholder="example.com/module"/>
                         </div>
                         <div>
-                                <label for="ed25519">Ed25519 public key (base64, optional)</label><br/>
-                                <input id="ed25519" name="ed25519" type="text" placeholder="MCowBQYDK2VwAyEA..."/>
+                                <label for="mldsa">ML-DSA public key hash (hex, optional)</label><br/>
+                                <input id="mldsa" name="mldsa" type="text" placeholder="e3b0c44298fc1c14..."/>
                         </div>
                         <div>
                                 <button type="submit">Open Atom Feed</button>
@@ -61,9 +61,9 @@
                 <h2>Authorizing Versions (Experimental)</h2>
 
                 <p>
-                        Source Spotter can accept go.sum files signed by an Ed25519 key to mark module versions
-						as authorized.  When you supply the public key's base64 representation via the
-                        <code>ed25519</code> parameter, the feed filters out the versions that have already been
+                        Source Spotter can accept go.sum files signed by an ML-DSA key to mark module versions
+						as authorized.  When you supply the SHA-256 hash of the public key via the
+                        <code>mldsa</code> parameter, the feed filters out the versions that have already been
                         authorized, allowing you to focus on unexpected releases.
 				</p>
 
@@ -73,9 +73,9 @@
                 </p>
 
 				<pre>struct {
-	Ed25519   []byte // Public key used to verify Signature
+	MLDSA     []byte // Raw ML-DSA public key used to verify Signature
 	GoSum     string // A go.sum file listing authorized module versions
-	Signature []byte // Ed25519 signature over GoSum
+	Signature []byte // ML-DSA signature over GoSum with an empty context string
 }</pre>
 
 				<p>
@@ -90,7 +90,7 @@
 				<p>Generate a new key (stored in <code>$XDG_CONFIG_HOME/sourcespotter-authorize/private_key</code> by default):</p>
 				<pre>$ sourcespotter-authorize -keygen</pre>
 
-				<p>Print the public key (base64):</p>
+				<p>Print the public key hash (hex):</p>
 				<pre>$ sourcespotter-authorize -pubkey</pre>
 
 				<p>Print the URL for the current module's Atom feed:</p>
