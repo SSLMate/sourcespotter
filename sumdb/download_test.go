@@ -48,7 +48,7 @@ func TestFormatTileIndex(t *testing.T) {
 	for i, test := range tests {
 		result := formatTileIndex(test.in)
 		if result != test.out {
-			t.Errorf("#%d: formatTileIndex(%q) = %q, want %q", i, test.in, result, test.out)
+			t.Errorf("#%d: formatTileIndex(%d) = %q, want %q", i, test.in, result, test.out)
 		}
 	}
 }
