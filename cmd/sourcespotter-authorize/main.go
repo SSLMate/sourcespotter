@@ -65,7 +65,7 @@ const (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed] [TAG...]")
+	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed|-import|-export] [TAG...]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -77,11 +77,13 @@ func main() {
 	keygen := flag.Bool("keygen", false, "Generate a new ML-DSA-44 private key")
 	pubkey := flag.Bool("pubkey", false, "Print the public key identifier used in feed URLs")
 	feed := flag.Bool("feed", false, "Print the modules feed URL")
+	doImport := flag.Bool("import", false, "Authorize the module versions in the go.sum file read from stdin")
+	doExport := flag.Bool("export", false, "Write the currently-authorized module versions to stdout in go.sum format")
 	flag.Usage = usage
 	flag.Parse()
 
 	modeCount := 0
-	for _, enabled := range []bool{*keygen, *pubkey, *feed} {
+	for _, enabled := range []bool{*keygen, *pubkey, *feed, *doImport, *doExport} {
 		if enabled {
 			modeCount++
 		}
@@ -111,6 +113,20 @@ func main() {
 			usage()
 		}
 		if err := runFeed(); err != nil {
+			log.Fatal(err)
+		}
+	case *doImport:
+		if len(args) != 0 {
+			usage()
+		}
+		if err := runImport(); err != nil {
+			log.Fatal(err)
+		}
+	case *doExport:
+		if len(args) != 0 {
+			usage()
+		}
+		if err := runExport(); err != nil {
 			log.Fatal(err)
 		}
 	default:
@@ -196,9 +212,6 @@ func runAuthorize(tags []string) error {
 		return err
 	}
 
-	domain := sourcespotterDomain()
-	endpoint := fmt.Sprintf("https://v1.api.%s/modules/authorized", domain)
-
 	goSumLines := make([]string, len(tags))
 	group := errgroup.Group{}
 	group.SetLimit(runtime.GOMAXPROCS(0))
@@ -213,7 +226,56 @@ func runAuthorize(tags []string) error {
 		return err
 	}
 
-	goSum := strings.Join(goSumLines, "")
+	return authorize(priv, strings.Join(goSumLines, ""))
+}
+
+func runImport() error {
+	priv, err := readPrivateKey()
+	if err != nil {
+		return err
+	}
+	goSum, err := io.ReadAll(os.Stdin)
+	if err != nil {
+		return fmt.Errorf("error reading go.sum from stdin: %w", err)
+	}
+	return authorize(priv, string(goSum))
+}
+
+func runExport() error {
+	priv, err := readPrivateKey()
+	if err != nil {
+		return err
+	}
+	pubkeyParam, pubkeyValue := priv.feedParam()
+
+	endpoint := fmt.Sprintf(
+		"https://v1.api.%s/modules/authorized?%s=%s",
+		sourcespotterDomain(),
+		pubkeyParam,
+		url.QueryEscape(pubkeyValue),
+	)
+
+	resp, err := http.Get(endpoint)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		msg, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		message := strings.TrimSpace(string(msg))
+		if message == "" {
+			message = resp.Status
+		}
+		return fmt.Errorf("export request failed: %s", message)
+	}
+	if _, err := io.Copy(os.Stdout, resp.Body); err != nil {
+		return fmt.Errorf("error writing go.sum to stdout: %w", err)
+	}
+	return nil
+}
+
+// authorize signs the given go.sum file and sends it to the authorization endpoint.
+func authorize(priv *privateKey, goSum string) error {
 	sig, err := priv.sign([]byte(goSum))
 	if err != nil {
 		return err
@@ -230,10 +292,9 @@ func runAuthorize(tags []string) error {
 		GoSum:     goSum,
 		Signature: sig,
 	}
-	if err := postAuthorized(endpoint, payload); err != nil {
-		return err
-	}
-	return nil
+
+	endpoint := fmt.Sprintf("https://v1.api.%s/modules/authorized", sourcespotterDomain())
+	return postAuthorized(endpoint, payload)
 }
 
 func keyPath() (string, error) {
