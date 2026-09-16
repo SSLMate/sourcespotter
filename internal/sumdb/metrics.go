@@ -28,9 +28,7 @@ package sumdb
 import (
 	"context"
 	"database/sql"
-	"encoding/base64"
 	"fmt"
-	"strconv"
 	"time"
 
 	"software.sslmate.com/src/sourcespotter"
@@ -77,36 +75,6 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 		return nil, fmt.Errorf("error querying sumdb state: %w", err)
 	}
 
-	var inconsistent []struct {
-		Address  string `sql:"address"`
-		TreeSize int64  `sql:"tree_size"`
-		RootHash []byte `sql:"root_hash"`
-	}
-	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &inconsistent, `
-		SELECT db.address, sth.tree_size, sth.root_hash
-		FROM sth JOIN db USING (db_id)
-		WHERE sth.consistent = FALSE
-		ORDER BY db.address, sth.tree_size, sth.root_hash
-	`); err != nil {
-		return nil, fmt.Errorf("error querying inconsistent STHs: %w", err)
-	}
-
-	var duplicateRecs []struct {
-		Address          string `sql:"address"`
-		Position         int64  `sql:"position"`
-		PreviousPosition int64  `sql:"previous_position"`
-		Module           string `sql:"module"`
-		Version          string `sql:"version"`
-	}
-	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &duplicateRecs, `
-		SELECT db.address, record.position, record.previous_position, record.module, record.version
-		FROM record JOIN db USING (db_id)
-		WHERE record.previous_position IS NOT NULL
-		ORDER BY db.address, record.position
-	`); err != nil {
-		return nil, fmt.Errorf("error querying duplicate records: %w", err)
-	}
-
 	largestSize := prom.NewGauge("sourcespotter_sumdb_largest_tree_size", "Tree size of the largest STH observed from the checksum database. Absent if no STHs have been observed.")
 	largestTime := prom.NewGauge("sourcespotter_sumdb_largest_tree_observed_timestamp_seconds", "Unix time at which the largest STH was first observed. Absent if no STHs have been observed.")
 	downloadSize := prom.NewGauge("sourcespotter_sumdb_downloaded_records", "Number of records downloaded from the checksum database. Absent if downloading has not started.")
@@ -116,8 +84,6 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 	inconsistentCount := prom.NewGauge("sourcespotter_sumdb_inconsistent_sths", "Number of observed STHs whose root hash does not match the downloaded records.")
 	duplicates := prom.NewGauge("sourcespotter_sumdb_duplicate_records", "Number of records that duplicate an earlier record for the same module version.")
 	failureLatest := prom.NewGauge("sourcespotter_sumdb_failure_latest_timestamp_seconds", "Unix time of the most recently observed failure of the given kind. Absent if no failure of that kind has been observed.")
-	inconsistentInfo := prom.NewGauge("sourcespotter_sumdb_inconsistent_sth_info", "One series per inconsistent STH.")
-	duplicateInfo := prom.NewGauge("sourcespotter_sumdb_duplicate_record_info", "One series per record that duplicates an earlier record for the same module version.")
 
 	for _, db := range dbs {
 		if db.Enabled {
@@ -147,26 +113,9 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 			failureLatest.AddTimestamp(db.LatestDuplicateRecord.V, "sumdb", db.Address, "kind", "duplicate_record")
 		}
 	}
-	for _, sth := range inconsistent {
-		inconsistentInfo.Add(1,
-			"sumdb", sth.Address,
-			"tree_size", strconv.FormatInt(sth.TreeSize, 10),
-			"root_hash", base64.StdEncoding.EncodeToString(sth.RootHash),
-		)
-	}
-
-	for _, rec := range duplicateRecs {
-		duplicateInfo.Add(1,
-			"sumdb", rec.Address,
-			"module", rec.Module,
-			"version", rec.Version,
-			"position", strconv.FormatInt(rec.Position, 10),
-			"previous_position", strconv.FormatInt(rec.PreviousPosition, 10),
-		)
-	}
 
 	return []*prom.Family{
 		largestSize, largestTime, downloadSize, verifiedSize, verifiedTime, unverified,
-		inconsistentCount, duplicates, failureLatest, inconsistentInfo, duplicateInfo,
+		inconsistentCount, duplicates, failureLatest,
 	}, nil
 }

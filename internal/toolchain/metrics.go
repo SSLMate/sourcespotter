@@ -27,7 +27,6 @@ package toolchain
 
 import (
 	"context"
-	"database/sql"
 	"fmt"
 	"time"
 
@@ -58,11 +57,6 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 		return nil, fmt.Errorf("error querying toolchain failures: %w", err)
 	}
 
-	var latest sql.Null[time.Time]
-	if err := sourcespotter.DB.QueryRowContext(ctx, `SELECT MAX(inserted_at) FROM toolchain_build`).Scan(&latest); err != nil {
-		return nil, fmt.Errorf("error querying latest toolchain build: %w", err)
-	}
-
 	builds := prom.NewGauge("sourcespotter_toolchain_builds", "Number of toolchain builds with the given status.")
 	countByStatus := make(map[string]int64)
 	for _, c := range counts {
@@ -77,10 +71,5 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 		failureTime.AddTimestamp(f.InsertedAt, "version", f.Version, "status", f.Status)
 	}
 
-	latestTime := prom.NewGauge("sourcespotter_toolchain_build_latest_timestamp_seconds", "Unix time of the most recent toolchain build. Absent if no builds have been attempted.")
-	if latest.Valid {
-		latestTime.AddTimestamp(latest.V)
-	}
-
-	return []*prom.Family{builds, failureTime, latestTime}, nil
+	return []*prom.Family{builds, failureTime}, nil
 }
