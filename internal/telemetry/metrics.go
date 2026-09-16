@@ -49,7 +49,13 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 	for _, row := range rows {
 		counters.Add(float64(row.Count), "program", row.Program, "type", row.Type)
 	}
-	// TODO: metric for number of telemetry errors
 
-	return []*prom.Family{counters}, nil
+	var numErrors int64
+	if err := sourcespotter.DB.QueryRowContext(ctx, `SELECT COUNT(*) FROM telemetry_config WHERE error IS NOT NULL`).Scan(&numErrors); err != nil {
+		return nil, fmt.Errorf("error counting telemetry config errors: %w", err)
+	}
+	errors := prom.NewGauge("sourcespotter_telemetry_config_errors", "Number of telemetry config versions that could not be processed.")
+	errors.Add(float64(numErrors))
+
+	return []*prom.Family{counters, errors}, nil
 }
