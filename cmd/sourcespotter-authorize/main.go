@@ -66,7 +66,9 @@ const (
 
 func usage() {
 	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed|-feed-for MODULE|-metrics|-metrics-for MODULE|-import|-export] [TAG...]")
+	fmt.Fprintln(os.Stderr, "flags:")
 	flag.PrintDefaults()
+	fmt.Fprintln(os.Stderr, "If no flags are provided, then sourcespotter-authorize authorizes the Git tags specified on the command line.")
 	os.Exit(2)
 }
 
