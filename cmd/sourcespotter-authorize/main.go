@@ -65,7 +65,7 @@ const (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed|-import|-export] [TAG...]")
+	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed|-metrics|-import|-export] [TAG...]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -77,13 +77,14 @@ func main() {
 	keygen := flag.Bool("keygen", false, "Generate a new ML-DSA-44 private key")
 	pubkey := flag.Bool("pubkey", false, "Print the public key identifier used in feed URLs")
 	feed := flag.Bool("feed", false, "Print the modules feed URL")
+	metrics := flag.Bool("metrics", false, "Print the modules Prometheus metrics URL")
 	doImport := flag.Bool("import", false, "Authorize the module versions in the go.sum file read from stdin")
 	doExport := flag.Bool("export", false, "Write the currently-authorized module versions to stdout in go.sum format")
 	flag.Usage = usage
 	flag.Parse()
 
 	modeCount := 0
-	for _, enabled := range []bool{*keygen, *pubkey, *feed, *doImport, *doExport} {
+	for _, enabled := range []bool{*keygen, *pubkey, *feed, *metrics, *doImport, *doExport} {
 		if enabled {
 			modeCount++
 		}
@@ -113,6 +114,13 @@ func main() {
 			usage()
 		}
 		if err := runFeed(); err != nil {
+			log.Fatal(err)
+		}
+	case *metrics:
+		if len(args) != 0 {
+			usage()
+		}
+		if err := runMetrics(); err != nil {
 			log.Fatal(err)
 		}
 	case *doImport:
@@ -179,6 +187,16 @@ func runPubkey() error {
 }
 
 func runFeed() error {
+	return printModuleURL("feeds.api", "/modules/versions.atom")
+}
+
+func runMetrics() error {
+	return printModuleURL("metrics.api", "/modules")
+}
+
+// printModuleURL prints the URL of an endpoint that takes the current
+// module's path and this key's public key as query parameters.
+func printModuleURL(subdomain, path string) error {
 	priv, err := readPrivateKey()
 	if err != nil {
 		return err
@@ -190,15 +208,15 @@ func runFeed() error {
 		return err
 	}
 
-	domain := sourcespotterDomain()
-	feedURL := fmt.Sprintf(
-		"https://feeds.api.%s/modules/versions.atom?module=%s&%s=%s",
-		domain,
+	fmt.Printf(
+		"https://%s.%s%s?module=%s&%s=%s\n",
+		subdomain,
+		sourcespotterDomain(),
+		path,
 		url.QueryEscape(modulePath),
 		pubkeyParam,
 		url.QueryEscape(pubkeyValue),
 	)
-	fmt.Println(feedURL)
 	return nil
 }
 
