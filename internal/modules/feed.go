@@ -50,7 +50,7 @@ func ServeVersionsAtom(w http.ResponseWriter, req *http.Request) {
 		args = append(args, module)
 	}
 	if pubkey != nil {
-		query += ` AND NOT EXISTS (SELECT 1 FROM authorized_record ar WHERE (ar.pubkey,ar.module,ar.version,ar.source_sha256,ar.gomod_sha256) IS NOT DISTINCT FROM ($2,r.module,r.version,r.source_sha256,r.gomod_sha256))`
+		query += ` AND NOT EXISTS (SELECT 1 FROM authorized_record ar WHERE ar.pubkey = $2 AND ar.module = r.module AND ar.version = r.version AND (ar.source_sha256,ar.gomod_sha256) IS NOT DISTINCT FROM (r.source_sha256,r.gomod_sha256))`
 		args = append(args, pubkey)
 	}
 	query += ` ORDER BY module, version, db_id, "position" DESC`
