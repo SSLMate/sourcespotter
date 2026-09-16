@@ -132,7 +132,8 @@ func Write(w io.Writer, families []*Family) error {
 func Serve(w http.ResponseWriter, families []*Family) {
 	w.Header().Set("Content-Type", ContentType)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Cache-Control", "public, max-age=300, must-revalidate")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
 	w.WriteHeader(http.StatusOK)
 	Write(w, families)
 }
