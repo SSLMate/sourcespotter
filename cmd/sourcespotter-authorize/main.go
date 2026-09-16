@@ -65,7 +65,7 @@ const (
 )
 
 func usage() {
-	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed|-metrics|-import|-export] [TAG...]")
+	fmt.Fprintln(os.Stderr, "usage: sourcespotter-authorize [-keygen|-pubkey|-feed|-feed-for MODULE|-metrics|-metrics-for MODULE|-import|-export] [TAG...]")
 	flag.PrintDefaults()
 	os.Exit(2)
 }
@@ -76,15 +76,17 @@ func main() {
 
 	keygen := flag.Bool("keygen", false, "Generate a new ML-DSA-44 private key")
 	pubkey := flag.Bool("pubkey", false, "Print the public key identifier used in feed URLs")
-	feed := flag.Bool("feed", false, "Print the modules feed URL")
-	metrics := flag.Bool("metrics", false, "Print the modules Prometheus metrics URL")
+	feed := flag.Bool("feed", false, "Print the modules feed URL for the current module")
+	feedFor := flag.String("feed-for", "", "Print the modules feed URL for `MODULE`")
+	metrics := flag.Bool("metrics", false, "Print the modules Prometheus metrics URL for the current module")
+	metricsFor := flag.String("metrics-for", "", "Print the modules Prometheus metrics URL for `MODULE`")
 	doImport := flag.Bool("import", false, "Authorize the module versions in the go.sum file read from stdin")
 	doExport := flag.Bool("export", false, "Write the currently-authorized module versions to stdout in go.sum format")
 	flag.Usage = usage
 	flag.Parse()
 
 	modeCount := 0
-	for _, enabled := range []bool{*keygen, *pubkey, *feed, *metrics, *doImport, *doExport} {
+	for _, enabled := range []bool{*keygen, *pubkey, *feed, *feedFor != "", *metrics, *metricsFor != "", *doImport, *doExport} {
 		if enabled {
 			modeCount++
 		}
@@ -109,18 +111,18 @@ func main() {
 		if err := runPubkey(); err != nil {
 			log.Fatal(err)
 		}
-	case *feed:
+	case *feed, *feedFor != "":
 		if len(args) != 0 {
 			usage()
 		}
-		if err := runFeed(); err != nil {
+		if err := runFeed(*feedFor); err != nil {
 			log.Fatal(err)
 		}
-	case *metrics:
+	case *metrics, *metricsFor != "":
 		if len(args) != 0 {
 			usage()
 		}
-		if err := runMetrics(); err != nil {
+		if err := runMetrics(*metricsFor); err != nil {
 			log.Fatal(err)
 		}
 	case *doImport:
@@ -186,26 +188,33 @@ func runPubkey() error {
 	return nil
 }
 
-func runFeed() error {
-	return printModuleURL("feeds.api", "/modules/versions.atom")
+// runFeed prints the feed URL for modulePath, or for the current module if
+// modulePath is empty.
+func runFeed(modulePath string) error {
+	return printModuleURL("feeds.api", "/modules/versions.atom", modulePath)
 }
 
-func runMetrics() error {
-	return printModuleURL("metrics.api", "/modules")
+// runMetrics prints the metrics URL for modulePath, or for the current
+// module if modulePath is empty.
+func runMetrics(modulePath string) error {
+	return printModuleURL("metrics.api", "/modules", modulePath)
 }
 
-// printModuleURL prints the URL of an endpoint that takes the current
-// module's path and this key's public key as query parameters.
-func printModuleURL(subdomain, path string) error {
+// printModuleURL prints the URL of an endpoint that takes a module path and
+// this key's public key as query parameters.  If modulePath is empty, the
+// current module's path is used.
+func printModuleURL(subdomain, path, modulePath string) error {
 	priv, err := readPrivateKey()
 	if err != nil {
 		return err
 	}
 	pubkeyParam, pubkeyValue := priv.feedParam()
 
-	modulePath, err := modulePathFromGoEnv()
-	if err != nil {
-		return err
+	if modulePath == "" {
+		modulePath, err = modulePathFromGoEnv()
+		if err != nil {
+			return err
+		}
 	}
 
 	fmt.Printf(
