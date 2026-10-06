@@ -58,6 +58,60 @@
         </section>
 
         <section>
+                <h2 id="metrics">Prometheus Metrics</h2>
+
+                <p>
+                        The same information is available as Prometheus metrics at
+                        <code>https://metrics.api.{{ $.Domain }}/modules</code>, so you can alert when an unexpected
+                        version of your module appears in the checksum database.
+                </p>
+
+                <p>The metrics endpoint accepts the following query parameters:</p>
+                <ul>
+                        <li><code>module</code> (required) &ndash; the module path to inspect. Append a trailing slash (<code>/</code>)
+                                to match all modules with the given prefix. May be specified up to 25 times to scrape
+                                several modules in one request.</li>
+                        <li><code>mldsa</code> (optional) &ndash; the hex-encoded SHA-256 hash of an ML-DSA public key. When supplied,
+                                the response also includes metrics about versions that have <strong>not</strong> been authorized
+                                by that key (see below).</li>
+                </ul>
+
+                <p>The following gauges are exported for each <code>module</code> parameter. Pre-release versions are not counted.</p>
+                <ul>
+                        <li><code>sourcespotter_module_versions{module="..."}</code> &ndash; the number of distinct versions
+                                observed in the checksum database.</li>
+                        <li><code>sourcespotter_module_latest_timestamp_seconds{module="..."}</code> &ndash; the Unix time at which
+                                the most recent version was observed. Absent if no versions have been observed.</li>
+                        <li><code>sourcespotter_module_unauthorized_versions{module="..."}</code> &ndash; the number of distinct
+                                versions not authorized by the given key. Only exported when <code>mldsa</code> is supplied.</li>
+                        <li><code>sourcespotter_module_unauthorized_version_info{module="...",version="..."}</code> &ndash; one series
+                                per unauthorized version, labeled with the module path and version. Only exported when
+                                <code>mldsa</code> is supplied.</li>
+                </ul>
+
+                <p>
+                        For example, to scrape <code>example.com/module</code> every 5 minutes, add the following to
+                        your Prometheus configuration:
+                </p>
+
+                <pre>scrape_configs:
+  - job_name: sourcespotter_modules
+    scheme: https
+    scrape_interval: 5m
+    metrics_path: /modules
+    params:
+      module: ["example.com/module"]
+      mldsa: ["e3b0c44298fc1c14..."]
+    static_configs:
+      - targets: ["metrics.api.{{ $.Domain }}"]</pre>
+
+                <p>
+                        You can then alert on <code>sourcespotter_module_unauthorized_versions &gt; 0</code> to be notified
+                        when the checksum database contains a version that you did not release.
+                </p>
+        </section>
+
+        <section>
                 <h2 id="authorize">Authorizing Versions</h2>
 
                 <p>
@@ -95,6 +149,9 @@
 
 				<p>Print the URL for the current module's Atom feed:</p>
 				<pre>$ sourcespotter-authorize -feed</pre>
+
+				<p>Print the URL for the current module's Prometheus metrics:</p>
+				<pre>$ sourcespotter-authorize -metrics</pre>
 
 				<p>Authorize a specific tag (or submodule tag like <code>subdir/v1.2.3</code>):</p>
 				<pre>$ sourcespotter-authorize v1.2.3</pre>
