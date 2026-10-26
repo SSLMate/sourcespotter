@@ -108,6 +108,14 @@ func (sth *STH) formatMessage() string {
 	return fmt.Sprintf("go.sum database tree\n%d\n%s\n", sth.TreeSize, sth.RootHash.Base64String())
 }
 
+// Checkpoint returns the STH as the text of a checkpoint note (see
+// https://c2sp.org/tlog-checkpoint): the origin line, tree size, and root
+// hash, each terminated by a newline.  This is the message that signatures
+// and cosignatures cover.
+func (sth *STH) Checkpoint() []byte {
+	return []byte(sth.formatMessage())
+}
+
 func (sth *STH) Authenticate(key []byte) error {
 	if len(key) == 0 {
 		return errors.New("key is too short")

@@ -32,14 +32,27 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
 	"software.sslmate.com/src/certspotter/merkletree"
 	"software.sslmate.com/src/sourcespotter"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 )
 
+// ServeGossip serves the latest STH that Source Spotter has verified for the
+// sumdb named by the "address" path value.  If the address is followed by
+// "+toolchain", it instead serves the latest STH cosigned by Source Spotter's
+// "<domain>/toolchain" key (see CosignerName).
 func ServeGossip(w http.ResponseWriter, req *http.Request) {
-	address := req.PathValue("address")
+	address, suffix, hasSuffix := strings.Cut(req.PathValue("address"), "+")
+	if hasSuffix {
+		if suffix == "toolchain" {
+			serveCosignedCheckpoint(w, req, address)
+		} else {
+			http.Error(w, "Not Found", 404)
+		}
+		return
+	}
 
 	var sth sumdb.STH
 	var rootHash []byte

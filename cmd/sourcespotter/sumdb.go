@@ -34,6 +34,7 @@ import (
 	"github.com/lib/pq"
 	"golang.org/x/sync/errgroup"
 	"software.sslmate.com/src/sourcespotter"
+	"software.sslmate.com/src/sourcespotter/cosign"
 	"software.sslmate.com/src/sourcespotter/internal/records"
 	"software.sslmate.com/src/sourcespotter/internal/sths"
 	"src.agwa.name/go-dbutil"
@@ -41,6 +42,7 @@ import (
 
 const (
 	downloadSTHInterval = 1 * time.Minute
+	cosignSTHInterval   = 1 * time.Minute
 	auditSTHInterval    = 15 * time.Minute * 10
 	ingestSleep         = 5 * time.Minute * 10
 	dbChannelName       = `events`
@@ -51,7 +53,7 @@ var (
 	sumdbSignals = make(map[int32]signals)
 )
 
-func monitorSumdb() {
+func monitorSumdb(cosigner *cosign.Signer) {
 	dbListener = pq.NewListener(sourcespotter.DBAddress, 5*time.Second, 2*time.Minute, nil)
 	if err := dbListener.Listen(dbChannelName); err != nil {
 		log.Fatal(err)
@@ -77,6 +79,11 @@ func monitorSumdb() {
 		group.Go(func() error {
 			return ingestRecords(ctx, id, signals.newSTH)
 		})
+		if cosigner != nil {
+			group.Go(func() error {
+				return cosignSTHs(ctx, id, cosigner, signals.cosign)
+			})
+		}
 	}
 	group.Go(func() error {
 		return handleNotifications(ctx)
@@ -87,12 +94,14 @@ func monitorSumdb() {
 type signals struct {
 	newSTH      signal
 	newPosition signal
+	cosign      signal
 }
 
 func makeSignals() signals {
 	return signals{
 		newSTH:      makeSignal(),
 		newPosition: makeSignal(),
+		cosign:      makeSignal(),
 	}
 }
 
@@ -126,6 +135,20 @@ func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{})
 			return err
 		}
 		if err := sleep(ctx, auditSTHInterval, newPositionSignal); err != nil {
+			return err
+		}
+	}
+}
+
+// cosignSTHs cosigns newly-eligible STHs whenever the verified position
+// advances, and periodically, since toolchain builds (which are possibly run
+// by a different process) also affect eligibility.
+func cosignSTHs(ctx context.Context, id int32, cosigner *cosign.Signer, cosignSignal <-chan struct{}) error {
+	for {
+		if err := sths.Cosign(ctx, id, cosigner); err != nil {
+			return err
+		}
+		if err := sleep(ctx, cosignSTHInterval, cosignSignal); err != nil {
 			return err
 		}
 	}
@@ -185,6 +208,7 @@ func handleNotification(n *pq.Notification) {
 		signals.newSTH.raise()
 	case "new_position":
 		signals.newPosition.raise()
+		signals.cosign.raise()
 	default:
 		log.Printf("Ignoring database notification with unknown event %q", payload.Event)
 	}

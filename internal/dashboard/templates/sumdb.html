@@ -30,7 +30,7 @@
 
 		<table>
 			<thead>
-				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH</th><th>Largest Verified STH</th><th>Verify Backlog</th><th>Download Backlog</th></tr>
+				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH</th><th>Largest Verified STH</th><th>Largest Cosigned STH</th><th>Verify Backlog</th><th>Cosign Backlog</th><th>Download Backlog</th></tr>
 			</thead>
 			<tbody>
 				{{ range .SumDBs }}
@@ -39,7 +39,9 @@
 						<td>{{ .LargestSTHTime.Format "2006-01-02 15:04:05 UTC" }}</td>
 						<td>{{ .LargestSTHSize }}</td>
 						<td>{{ .VerifiedSize }} (<a href="https://gossip.api.{{ $.Domain }}/{{ .Address }}">Download</a>)</td>
+						<td>{{ if .CosignedSize.Valid }}{{ .CosignedSize.V }} (<a href="https://gossip.api.{{ $.Domain }}/{{ .Address }}+toolchain">Download</a>){{ else }}None{{ end }}</td>
 						<td>{{ .VerifyBacklog }}</td>
+						<td>{{ .CosignBacklog }}</td>
 						<td>{{ .DownloadBacklog }}</td>
 					</tr>
 				{{ end }}
@@ -126,5 +128,28 @@
 			<li><code>pending</code> - Source Spotter doesn't know yet if the uploaded STH is consistent with other STHs seen by Source Spotter; it will be saved for future auditing and published on this page if it's inconsistent</li>
 		</ul>
 	</section>
+	{{ if $.CosignerKey }}
+	<section>
+		<h2>Witnessing</h2>
+
+		<p>
+			Source Spotter <a href="https://c2sp.org/tlog-cosignature">cosigns</a> checksum database STHs using the following key: <code>{{ $.CosignerKey }}</code>
+		</p>
+
+		<p>
+			The cosignatures attest to the following:
+		</p>
+		<ul>
+			<li>The STH is consistent with every STH that Source Spotter has previously cosigned.</li>
+			<li>Every Go toolchain in the tree has been <a href="/toolchain/">verified to be reproducible</a> (or skipped because that version of Go does not support reproducible builds).</li>
+		</ul>
+		<p>
+			To retrieve the latest STH that we've cosigned, <code>GET</code> <code>https://gossip.api.{{ $.Domain }}/<var>$GOSUMDB</var>+toolchain</code>,
+			for example <code><a href="https://gossip.api.{{ $.Domain }}/sum.golang.org+toolchain">https://gossip.api.{{ $.Domain }}/sum.golang.org+toolchain</a></code>.
+			The cosigned STH lags behind the largest verified STH while
+			newly published toolchains are being rebuilt.
+		</p>
+	</section>
+	{{ end }}
 </main>
 {{ end }}

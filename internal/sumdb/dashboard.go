@@ -27,6 +27,7 @@ package sumdb
 
 import (
 	"context"
+	"database/sql"
 	"encoding/base64"
 	"html/template"
 	"log"
@@ -36,6 +37,7 @@ import (
 	"software.sslmate.com/src/certspotter/merkletree"
 	"software.sslmate.com/src/sourcespotter"
 	basedashboard "software.sslmate.com/src/sourcespotter/internal/dashboard"
+	"software.sslmate.com/src/sourcespotter/internal/sths"
 	"software.sslmate.com/src/sourcespotter/sumdb"
 	"src.agwa.name/go-dbutil"
 )
@@ -46,6 +48,8 @@ type SumDB struct {
 	LargestSTHTime time.Time
 	DownloadSize   uint64
 	VerifiedSize   uint64
+	CosignedSize   sql.Null[uint64]
+	CosignedTime   sql.Null[time.Time]
 }
 
 func (db *SumDB) DownloadBacklog() uint64 {
@@ -54,6 +58,10 @@ func (db *SumDB) DownloadBacklog() uint64 {
 
 func (db *SumDB) VerifyBacklog() uint64 {
 	return db.LargestSTHSize - db.VerifiedSize
+}
+
+func (db *SumDB) CosignBacklog() uint64 {
+	return db.LargestSTHSize - db.CosignedSize.V
 }
 
 type InconsistentSTH struct {
@@ -97,13 +105,14 @@ type DuplicateRecord struct {
 
 type Dashboard struct {
 	Domain           string
+	CosignerKey      string // verifier key for cosigned STHs, or empty if cosigning is not enabled
 	SumDBs           []SumDB
 	InconsistentSTHs []InconsistentSTH
 	DuplicateRecords []DuplicateRecord
 }
 
 func LoadDashboard(ctx context.Context) (*Dashboard, error) {
-	dashboard := &Dashboard{Domain: sourcespotter.Domain}
+	dashboard := &Dashboard{Domain: sourcespotter.Domain, CosignerKey: sths.CosignerVerifierKey}
 
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.SumDBs, `
 		SELECT
@@ -111,7 +120,9 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 			(SELECT MAX(tree_size) FROM sth WHERE db_id = db.db_id) AS "LargestSTHSize",
 			(SELECT MAX(observed_at) FROM sth WHERE db_id = db.db_id AND tree_size = (SELECT MAX(tree_size) FROM sth WHERE db_id = db.db_id)) AS "LargestSTHTime",
 			db.download_position->>'size' AS "DownloadSize",
-			db.verified_position->>'size' AS "VerifiedSize"
+			db.verified_position->>'size' AS "VerifiedSize",
+			(SELECT MAX(tree_size) FROM cosigned_sth WHERE db_id = db.db_id) AS "CosignedSize",
+			(SELECT MAX(cosigned_at) FROM cosigned_sth WHERE db_id = db.db_id) AS "CosignedTime"
 		FROM db
 		WHERE db.enabled
 		ORDER BY db.address

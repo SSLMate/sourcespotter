@@ -55,6 +55,26 @@ END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER unverified_sth_inserted AFTER INSERT ON sth FOR EACH ROW WHEN (NEW.consistent IS NULL) EXECUTE PROCEDURE after_unverified_sth_insert();
 
+-- Cosigned tree sizes must be monotonically increasing, and the cosigned STH must
+-- match the root hash that was calculated from the downloaded records.
+CREATE FUNCTION before_cosigned_sth_insert() RETURNS trigger AS $$
+BEGIN
+	IF NEW.tree_size <= (SELECT coalesce(MAX(tree_size), 0) FROM cosigned_sth WHERE db_id = NEW.db_id) THEN
+		RAISE EXCEPTION 'cosigned tree size % for db % does not exceed previously cosigned tree size', NEW.tree_size, NEW.db_id;
+	END IF;
+	IF NOT EXISTS (
+		SELECT 1
+		FROM sth
+		JOIN record ON (record.db_id, record.position) = (sth.db_id, sth.tree_size - 1)
+		WHERE sth.sth_id = NEW.sth_id AND sth.db_id = NEW.db_id AND sth.tree_size = NEW.tree_size AND record.root_hash = sth.root_hash
+	) THEN
+		RAISE EXCEPTION 'STH % does not match the root hash calculated from downloaded records', NEW.sth_id;
+	END IF;
+	RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+CREATE TRIGGER cosigned_sth_insert BEFORE INSERT ON cosigned_sth FOR EACH ROW EXECUTE PROCEDURE before_cosigned_sth_insert();
+
 CREATE FUNCTION before_record_insert() RETURNS trigger AS $$
 BEGIN
 	NEW.previous_position = (SELECT position FROM record WHERE (module,version,db_id) = (NEW.module,NEW.version,NEW.db_id) ORDER BY position DESC LIMIT 1);

@@ -52,6 +52,20 @@ CREATE UNIQUE INDEX sth_unique ON sth (db_id, tree_size, root_hash);
 CREATE INDEX sth_inconsistent ON sth (db_id) WHERE consistent = FALSE;
 CREATE INDEX sth_unverified ON sth (db_id, tree_size) WHERE consistent IS NULL;
 
+-- STHs that have been cosigned with Source Spotter's "<domain>/toolchain" key.
+-- An STH is cosigned only if its root hash matches the records downloaded from
+-- the checksum database and every golang.org/toolchain record in the tree has
+-- been verified to be reproducible (or skipped as not reproducible).
+CREATE TABLE cosigned_sth (
+	db_id			int NOT NULL REFERENCES db,
+	tree_size		bigint NOT NULL,
+	sth_id			bigint NOT NULL REFERENCES sth,
+	cosigned_at		timestamptz NOT NULL, -- the timestamp in the cosignature
+	cosignature		bytea NOT NULL, -- key hash, timestamp, and Ed25519 signature, per https://c2sp.org/tlog-cosignature
+
+	PRIMARY KEY (db_id, tree_size)
+);
+
 CREATE TABLE record (
 	db_id			int NOT NULL REFERENCES db,
 	position		bigint NOT NULL,
