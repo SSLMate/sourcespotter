@@ -42,6 +42,10 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 CREATE TRIGGER cosigned_sth_insert BEFORE INSERT ON cosigned_sth FOR EACH ROW EXECUTE PROCEDURE before_cosigned_sth_insert();
+CREATE UNIQUE INDEX cosigned_sth_sth_id ON cosigned_sth (sth_id);
+ALTER TABLE toolchain_build
+	ADD COLUMN cosigned_sth_id bigint REFERENCES cosigned_sth (sth_id),
+	ADD COLUMN proof bytea;
 COMMIT;
 ```
 
@@ -76,3 +80,18 @@ auditor (`-toolchain`) is not running or has not gotten to it yet.
 Cosignatures are never revoked.  If a previously cosigned toolchain is later
 rebuilt and found to be unequal, no new STHs are cosigned until the problem is
 resolved, but the previously cosigned STH continues to be served.
+
+# Inclusion proofs are missing for some toolchains
+
+`proof.api.DOMAIN/golang.org/toolchain@VERSION` returns 404 with "not yet
+included in a cosigned STH" when the `toolchain_build` row has no proof.  After
+each cosigning attempt, the `-sumdb` daemon computes proofs for verified
+toolchains whose record position is below the latest cosigned tree size, so
+this resolves itself once the cosigned STH covers the record.  If it persists,
+check the daemon log: a failure to download hash tiles from the checksum
+database ends the pass early and is retried on the next pass (every minute).
+The first pass after enabling cosigning computes proofs for every existing
+toolchain and takes a few minutes.
+
+Deleting a `toolchain_build` row to retry a build also discards its proof; a
+new proof is computed after the rebuild succeeds.

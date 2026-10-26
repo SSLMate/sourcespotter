@@ -79,6 +79,8 @@ func newHTTPServer() *http.Server {
 	// gossip API
 	mux.HandleFunc("GET gossip.api."+domain+"/{address}", sths.ServeGossip)
 	mux.HandleFunc("POST gossip.api."+domain+"/{address}", sths.ReceiveGossip)
+	// proof API
+	mux.HandleFunc("GET proof.api."+domain+"/{path...}", sths.ServeProof)
 	// cooldown API
 	mux.HandleFunc("GET cooldown.api."+domain+"/", cooldown.Serve)
 	// v1 public API

@@ -65,6 +65,7 @@ CREATE TABLE cosigned_sth (
 
 	PRIMARY KEY (db_id, tree_size)
 );
+CREATE UNIQUE INDEX cosigned_sth_sth_id ON cosigned_sth (sth_id);
 
 CREATE TABLE record (
 	db_id			int NOT NULL REFERENCES db,
@@ -107,6 +108,10 @@ CREATE TABLE toolchain_build (
 	message		text,
 	build_id	bytea,
 	build_duration	interval,
+	-- Inclusion proof of the toolchain's sumdb record in a cosigned STH, set
+	-- once an STH containing the record has been cosigned (see cosigned_sth).
+	cosigned_sth_id	bigint REFERENCES cosigned_sth (sth_id),
+	proof		bytea, -- concatenated SHA-256 hashes, leaf sibling first (RFC 6962 inclusion proof)
 
 	PRIMARY KEY (version)
 );

@@ -142,10 +142,14 @@ func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{})
 
 // cosignSTHs cosigns newly-eligible STHs whenever the verified position
 // advances, and periodically, since toolchain builds (which are possibly run
-// by a different process) also affect eligibility.
+// by a different process) also affect eligibility.  After each attempt, it
+// computes inclusion proofs for toolchains covered by the latest cosigned STH.
 func cosignSTHs(ctx context.Context, id int32, cosigner *cosign.Signer, cosignSignal <-chan struct{}) error {
 	for {
 		if err := sths.Cosign(ctx, id, cosigner); err != nil {
+			return err
+		}
+		if err := sths.FillToolchainProofs(ctx, id); err != nil {
 			return err
 		}
 		if err := sleep(ctx, cosignSTHInterval, cosignSignal); err != nil {

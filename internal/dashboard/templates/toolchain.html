@@ -24,7 +24,7 @@
 				</p>
 				<ul class="versionlist" id="verified">
 						{{ range .Verified }}
-								<li>{{ . }}</li>
+								<li><a href="https://proof.api.{{ $.Domain }}/golang.org/toolchain@{{ . }}" title="Download sumdb record and inclusion proof">{{ . }}</a></li>
 						{{ end }}
 				</ul>
 			</details>
@@ -82,6 +82,23 @@
 					<a href="https://feeds.api.{{ $.Domain }}/toolchain/sources.csv">CSV of Sources</a>
 				</p>
 			</details>
+	</section>
+	<section>
+		<h2>Attestations</h2>
+		<p>
+			To retrieve an attestation that a toolchain is reproducible,
+			download <code>https://proof.api.{{ $.Domain }}/golang.org/toolchain@<var>$VERSION</var></code>,
+			for example <code><a href="https://proof.api.{{ $.Domain }}/golang.org/toolchain@v0.0.1-go1.24.0.linux-amd64">https://proof.api.{{ $.Domain }}/golang.org/toolchain@v0.0.1-go1.24.0.linux-amd64</a></code>.
+		</p>
+		<p>
+			The response is the toolchain's checksum database record
+			(two <code>go.sum</code> lines for the module zip and go.mod file),
+			a blank line, and a <a href="https://c2sp.org/tlog-proof">tlog-proof</a>.
+			The checkpoint in the tlog-proof contains two signatures:
+			the checksum database's signature (attesting that the toolchain is authentic and
+			published in the transparency log) and Source Spotter's cosignature (attesting that
+			the toolchain is published and reproducible from source).
+		</p>
 	</section>
 	<section>
 		<h2>Methodology</h2>

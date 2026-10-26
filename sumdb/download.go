@@ -35,6 +35,8 @@ import (
 	mathrand "math/rand/v2"
 	"net/http"
 	"time"
+
+	"golang.org/x/mod/sumdb/tlog"
 )
 
 var httpClient = http.DefaultClient
@@ -150,6 +152,21 @@ func DownloadRecords(ctx context.Context, address string, begin, end uint64, rec
 		begin += uint64(len(records))
 	}
 	return ctx.Err()
+}
+
+// DownloadTile downloads a hash tile from the sumdb.  The sumdb stops serving
+// a partial tile once the tile is complete, so callers wanting a partial tile
+// should fall back to the full tile.
+func DownloadTile(ctx context.Context, address string, tile tlog.Tile) ([]byte, error) {
+	url := fmt.Sprintf("https://%s/%s", address, tile.Path())
+	data, err := fetch(ctx, url)
+	if err != nil {
+		return nil, err
+	}
+	if len(data) != tile.W*tlog.HashSize {
+		return nil, fmt.Errorf("%s returned %d bytes instead of %d", url, len(data), tile.W*tlog.HashSize)
+	}
+	return data, nil
 }
 
 func DownloadAndAuthenticateSTH(ctx context.Context, address string, key []byte) (*STH, error) {
