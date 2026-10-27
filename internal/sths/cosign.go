@@ -171,7 +171,7 @@ func serveCosignedCheckpoint(w http.ResponseWriter, req *http.Request, address s
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "max-age=60")
+	w.Header().Set("Cache-Control", "public, max-age=60, must-revalidate")
 	w.WriteHeader(200)
 	fmt.Fprint(w, FormatCosignedSTH(&sth, address, cosignature))
 }

@@ -216,7 +216,7 @@ func ServeAttestation(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if modulePath != toolchainModule {
-		http.Error(w, "Attestations are only available for "+toolchainModule, 404)
+		http.Error(w, "Attestations are only available for "+toolchainModule, 400)
 		return
 	}
 
@@ -266,7 +266,7 @@ func ServeAttestation(w http.ResponseWriter, req *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	w.Header().Set("Cache-Control", "max-age=86400")
+	w.Header().Set("Cache-Control", "public, max-age=86400, must-revalidate")
 	w.WriteHeader(200)
 	writeAttestation(w, record.Format(), position, recordProof, FormatCosignedSTH(&sth, address, cosignature))
 }
