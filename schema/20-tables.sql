@@ -111,7 +111,7 @@ CREATE TABLE toolchain_build (
 	-- Inclusion proof of the toolchain's sumdb record in a cosigned STH, set
 	-- once an STH containing the record has been cosigned (see cosigned_sth).
 	cosigned_sth_id	bigint REFERENCES cosigned_sth (sth_id),
-	proof		bytea, -- concatenated SHA-256 hashes, leaf sibling first (RFC 6962 inclusion proof)
+	inclusion_proof	bytea, -- concatenated SHA-256 hashes, leaf sibling first (RFC 6962 inclusion proof)
 
 	PRIMARY KEY (version)
 );

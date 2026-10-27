@@ -45,7 +45,7 @@ CREATE TRIGGER cosigned_sth_insert BEFORE INSERT ON cosigned_sth FOR EACH ROW EX
 CREATE UNIQUE INDEX cosigned_sth_sth_id ON cosigned_sth (sth_id);
 ALTER TABLE toolchain_build
 	ADD COLUMN cosigned_sth_id bigint REFERENCES cosigned_sth (sth_id),
-	ADD COLUMN proof bytea;
+	ADD COLUMN inclusion_proof bytea;
 COMMIT;
 ```
 
@@ -84,7 +84,7 @@ resolved, but the previously cosigned STH continues to be served.
 # Attestations are missing for some toolchains
 
 `attestation.api.DOMAIN/golang.org/toolchain@VERSION` returns 503 with "not yet
-been verified as reproducible" when the `toolchain_build` row has no proof.  After
+been verified as reproducible" when the `toolchain_build` row has no inclusion proof.  After
 each cosigning attempt, the `-sumdb` daemon computes proofs for verified
 toolchains whose record position is below the latest cosigned tree size, so
 this resolves itself once the cosigned STH covers the record.  If it persists,

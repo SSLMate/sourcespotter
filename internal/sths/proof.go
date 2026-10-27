@@ -164,7 +164,7 @@ func FillToolchainProofs(ctx context.Context, sumdbid int32) error {
 		SELECT toolchain_build.version, MIN(record.position) AS position
 		FROM toolchain_build
 		JOIN record ON record.db_id = $1 AND record.module = $2 AND record.version = toolchain_build.version
-		WHERE toolchain_build.proof IS NULL
+		WHERE toolchain_build.inclusion_proof IS NULL
 		GROUP BY toolchain_build.version
 		HAVING MIN(record.position) < $3
 		ORDER BY MIN(record.position)
@@ -184,7 +184,7 @@ func FillToolchainProofs(ctx context.Context, sumdbid int32) error {
 			log.Printf("%s: error proving inclusion of record %d (%s) in tree of size %d (will retry later): %s", address, p.Position, p.Version, treeSize, err)
 			return ctx.Err()
 		}
-		if _, err := sourcespotter.DB.ExecContext(ctx, `UPDATE toolchain_build SET proof = $1, cosigned_sth_id = $2 WHERE version = $3 AND proof IS NULL`, encodeProof(recordProof), sthID, p.Version); err != nil {
+		if _, err := sourcespotter.DB.ExecContext(ctx, `UPDATE toolchain_build SET inclusion_proof = $1, cosigned_sth_id = $2 WHERE version = $3 AND inclusion_proof IS NULL`, encodeProof(recordProof), sthID, p.Version); err != nil {
 			return fmt.Errorf("error storing inclusion proof for %s: %w", p.Version, err)
 		}
 		if (i+1)%500 == 0 {
@@ -230,13 +230,13 @@ func ServeAttestation(w http.ResponseWriter, req *http.Request) {
 		cosignature  []byte
 	)
 	if err := sourcespotter.DB.QueryRowContext(req.Context(), `
-		SELECT db.address, record.position, record.source_sha256, record.gomod_sha256, toolchain_build.proof, sth.tree_size, sth.root_hash, sth.signature, cosigned_sth.cosignature
+		SELECT db.address, record.position, record.source_sha256, record.gomod_sha256, toolchain_build.inclusion_proof, sth.tree_size, sth.root_hash, sth.signature, cosigned_sth.cosignature
 		FROM toolchain_build
 		JOIN cosigned_sth ON cosigned_sth.sth_id = toolchain_build.cosigned_sth_id
 		JOIN sth ON sth.sth_id = cosigned_sth.sth_id
 		JOIN db ON db.db_id = cosigned_sth.db_id
 		JOIN record ON record.db_id = db.db_id AND record.module = $1 AND record.version = toolchain_build.version
-		WHERE toolchain_build.version = $2 AND toolchain_build.proof IS NOT NULL
+		WHERE toolchain_build.version = $2 AND toolchain_build.inclusion_proof IS NOT NULL
 		ORDER BY record.position
 		LIMIT 1
 	`, modulePath, version).Scan(&address, &position, &record.SourceSHA256, &record.GomodSHA256, &encodedProof, &sth.TreeSize, &rootHash, &sth.Signature, &cosignature); err != nil {
