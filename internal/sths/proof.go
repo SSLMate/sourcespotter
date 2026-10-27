@@ -195,10 +195,11 @@ func FillToolchainProofs(ctx context.Context, sumdbid int32) error {
 	return nil
 }
 
-// ServeProof serves, for the toolchain module version named by the "path"
+// ServeAttestation serves, for the toolchain module version named by the "path"
 // path value (as MODULE@VERSION, escaped as in the sumdb's lookup endpoint),
-// the sumdb record followed by a proof of its inclusion in a cosigned STH.
-func ServeProof(w http.ResponseWriter, req *http.Request) {
+// an attestation: the sumdb record followed by a tlog-proof of its inclusion
+// in a cosigned STH.
+func ServeAttestation(w http.ResponseWriter, req *http.Request) {
 	escapedModule, escapedVersion, ok := strings.Cut(req.PathValue("path"), "@")
 	if !ok {
 		http.Error(w, "Expected MODULE@VERSION", 400)
@@ -215,7 +216,7 @@ func ServeProof(w http.ResponseWriter, req *http.Request) {
 		return
 	}
 	if modulePath != toolchainModule {
-		http.Error(w, "Proofs are only available for "+toolchainModule, 404)
+		http.Error(w, "Attestations are only available for "+toolchainModule, 404)
 		return
 	}
 
@@ -242,7 +243,7 @@ func ServeProof(w http.ResponseWriter, req *http.Request) {
 		if errors.Is(err, sql.ErrNoRows) {
 			var exists bool
 			if err := sourcespotter.DB.QueryRowContext(req.Context(), `SELECT EXISTS(SELECT 1 FROM record WHERE module = $1 AND version = $2)`, modulePath, version).Scan(&exists); err != nil {
-				log.Printf("ServeProof: error querying record for %s@%s: %s", modulePath, version, err)
+				log.Printf("ServeAttestation: error querying record for %s@%s: %s", modulePath, version, err)
 				http.Error(w, "Internal Database Error", 500)
 			} else if exists {
 				http.Error(w, "This toolchain has not yet been verified as reproducible. Please check back later.", 503)
@@ -250,7 +251,7 @@ func ServeProof(w http.ResponseWriter, req *http.Request) {
 				http.Error(w, "Toolchain Version Not Found", 404)
 			}
 		} else {
-			log.Printf("ServeProof: error loading proof for %s@%s: %s", modulePath, version, err)
+			log.Printf("ServeAttestation: error loading proof for %s@%s: %s", modulePath, version, err)
 			http.Error(w, "Internal Database Error", 500)
 		}
 		return
@@ -258,7 +259,7 @@ func ServeProof(w http.ResponseWriter, req *http.Request) {
 	sth.RootHash = (merkletree.Hash)(rootHash)
 	recordProof, err := decodeProof(encodedProof)
 	if err != nil {
-		log.Printf("ServeProof: malformed stored proof for %s@%s: %s", modulePath, version, err)
+		log.Printf("ServeAttestation: malformed stored proof for %s@%s: %s", modulePath, version, err)
 		http.Error(w, "Internal Database Error", 500)
 		return
 	}
@@ -267,13 +268,13 @@ func ServeProof(w http.ResponseWriter, req *http.Request) {
 	w.Header().Set("X-Content-Type-Options", "nosniff")
 	w.Header().Set("Cache-Control", "max-age=86400")
 	w.WriteHeader(200)
-	writeProofDocument(w, record.Format(), position, recordProof, FormatCosignedSTH(&sth, address, cosignature))
+	writeAttestation(w, record.Format(), position, recordProof, FormatCosignedSTH(&sth, address, cosignature))
 }
 
-// writeProofDocument writes a record followed by an empty line and a
-// c2sp.org/tlog-proof proving the record's inclusion at the given index in
-// the given checkpoint.
-func writeProofDocument(w io.Writer, record []byte, index int64, recordProof tlog.RecordProof, checkpoint string) {
+// writeAttestation writes an attestation: a record followed by an empty line
+// and a c2sp.org/tlog-proof proving the record's inclusion at the given index
+// in the given checkpoint.
+func writeAttestation(w io.Writer, record []byte, index int64, recordProof tlog.RecordProof, checkpoint string) {
 	w.Write(record)
 	fmt.Fprintf(w, "\nc2sp.org/tlog-proof@v1\nindex %d\n", index)
 	for _, h := range recordProof {

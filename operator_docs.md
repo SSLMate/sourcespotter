@@ -81,10 +81,10 @@ Cosignatures are never revoked.  If a previously cosigned toolchain is later
 rebuilt and found to be unequal, no new STHs are cosigned until the problem is
 resolved, but the previously cosigned STH continues to be served.
 
-# Inclusion proofs are missing for some toolchains
+# Attestations are missing for some toolchains
 
-`proof.api.DOMAIN/golang.org/toolchain@VERSION` returns 404 with "not yet
-included in a cosigned STH" when the `toolchain_build` row has no proof.  After
+`attestation.api.DOMAIN/golang.org/toolchain@VERSION` returns 503 with "not yet
+been verified as reproducible" when the `toolchain_build` row has no proof.  After
 each cosigning attempt, the `-sumdb` daemon computes proofs for verified
 toolchains whose record position is below the latest cosigned tree size, so
 this resolves itself once the cosigned STH covers the record.  If it persists,

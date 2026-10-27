@@ -156,11 +156,11 @@ func TestTileReader(t *testing.T) {
 	}
 }
 
-func TestWriteProofDocument(t *testing.T) {
+func TestWriteAttestation(t *testing.T) {
 	var h1, h2 tlog.Hash
 	h1[0], h2[0] = 1, 2
 	var got strings.Builder
-	writeProofDocument(&got, []byte("a v1 h1:x\na v1/go.mod h1:y\n"), 7, tlog.RecordProof{h1, h2}, "go.sum database tree\n8\nAAAA\n\n— sum.golang.org sig\n")
+	writeAttestation(&got, []byte("a v1 h1:x\na v1/go.mod h1:y\n"), 7, tlog.RecordProof{h1, h2}, "go.sum database tree\n8\nAAAA\n\n— sum.golang.org sig\n")
 	want := "a v1 h1:x\na v1/go.mod h1:y\n\nc2sp.org/tlog-proof@v1\nindex 7\n" +
 		"AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n" +
 		"AgAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n" +
