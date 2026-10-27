@@ -30,7 +30,7 @@
 
 		<table>
 			<thead>
-				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH</th><th>Largest Verified STH</th>{{/* TODO: re-enable <th>Largest Cosigned STH</th> */}}<th>Verify Backlog</th>{{/* TODO: re-enable <th>Cosign Backlog</th> */}}<th>Download Backlog</th></tr>
+				<tr><th>Database</th><th>Largest STH Seen At</th><th>Largest STH</th><th>Largest Verified STH</th><th>Largest Cosigned STH</th><th>Verify Backlog</th><th>Cosign Backlog</th><th>Download Backlog</th></tr>
 			</thead>
 			<tbody>
 				{{ range .SumDBs }}
@@ -39,13 +39,9 @@
 						<td>{{ .LargestSTHTime.Format "2006-01-02 15:04:05 UTC" }}</td>
 						<td>{{ .LargestSTHSize }}</td>
 						<td>{{ .VerifiedSize }} (<a href="https://gossip.api.{{ $.Domain }}/{{ .Address }}">Download</a>)</td>
-						{{/* TODO: re-enable
 						<td>{{ if .CosignedSize.Valid }}{{ .CosignedSize.V }} (<a href="https://gossip.api.{{ $.Domain }}/{{ .Address }}+toolchain">Download</a>){{ else }}None{{ end }}</td>
-						*/}}
 						<td>{{ .VerifyBacklog }}</td>
-						{{/* TODO: re-enable
 						<td>{{ .CosignBacklog }}</td>
-						*/}}
 						<td>{{ .DownloadBacklog }}</td>
 					</tr>
 				{{ end }}
@@ -132,7 +128,6 @@
 			<li><code>pending</code> - Source Spotter doesn't know yet if the uploaded STH is consistent with other STHs seen by Source Spotter; it will be saved for future auditing and published on this page if it's inconsistent</li>
 		</ul>
 	</section>
-	{{/* TODO: re-enable
 	{{ if $.CosignerKey }}
 	<section>
 		<h2>Witnessing</h2>
@@ -156,6 +151,5 @@
 		</p>
 	</section>
 	{{ end }}
-	*/}}
 </main>
 {{ end }}
