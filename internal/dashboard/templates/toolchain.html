@@ -24,7 +24,10 @@
 				</p>
 				<ul class="versionlist" id="verified">
 						{{ range .Verified }}
+								<li>{{ . }}</li>
+								{{/* TODO: re-enable
 								<li><a href="https://attestation.api.{{ $.Domain }}/golang.org/toolchain@{{ . }}" title="Download attestation">{{ . }}</a></li>
+								*/}}
 						{{ end }}
 				</ul>
 			</details>
@@ -83,6 +86,7 @@
 				</p>
 			</details>
 	</section>
+	{{/* TODO: re-enable
 	<section>
 		<h2>Attestations</h2>
 		<p>
@@ -100,6 +104,7 @@
 			the toolchain is published and reproducible from source).
 		</p>
 	</section>
+	*/}}
 	<section>
 		<h2>Methodology</h2>
 
