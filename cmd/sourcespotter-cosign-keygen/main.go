@@ -42,9 +42,10 @@ func main() {
 	log.SetFlags(0)
 
 	domain := flag.String("domain", "", "The `DOMAIN` configured in sourcespotter's config file (required)")
+	out := flag.String("out", "", "Write the private key to `FILE`, which must not already exist (required)")
 	flag.Parse()
-	if *domain == "" || flag.NArg() != 0 {
-		fmt.Fprintln(os.Stderr, "usage: sourcespotter-cosign-keygen -domain DOMAIN")
+	if *domain == "" || *out == "" || flag.NArg() != 0 {
+		fmt.Fprintln(os.Stderr, "usage: sourcespotter-cosign-keygen -domain DOMAIN -out FILE")
 		flag.PrintDefaults()
 		os.Exit(2)
 	}
@@ -57,6 +58,17 @@ func main() {
 		log.Fatal(err)
 	}
 
-	fmt.Printf("Private key (set Cosign.Key to this in sourcespotter's config file):\n%s\n\n", skey)
+	f, err := os.OpenFile(*out, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := fmt.Fprintln(f, skey); err != nil {
+		log.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Private key written to %s (set Cosign.KeyFile to this path in sourcespotter's config file)\n", *out)
 	fmt.Printf("Public (verifier) key:\n%s\n", vkey)
 }

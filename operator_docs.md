@@ -49,9 +49,9 @@ ALTER TABLE toolchain_build
 COMMIT;
 ```
 
-Generate a key with `sourcespotter-cosign-keygen -domain DOMAIN`, put the
-private key in `Cosign.Key` in the config file, and restart the `-sumdb` daemon.  The
-verifier key is printed by the keygen command and logged by the daemon at startup.
+Generate a key with `sourcespotter-cosign-keygen -domain DOMAIN -out FILE`, set
+`Cosign.KeyFile` to the file's path in the config file, and restart the `-sumdb`
+daemon.  The verifier key is printed by the keygen command.
 
 # The cosigned STH has stopped advancing
 
