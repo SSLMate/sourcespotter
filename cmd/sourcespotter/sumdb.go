@@ -140,10 +140,10 @@ func auditSTHs(ctx context.Context, id int32, newPositionSignal <-chan struct{})
 	}
 }
 
-// cosignSTHs cosigns newly-eligible STHs whenever the verified position
-// advances, and periodically, since toolchain builds (which are possibly run
-// by a different process) also affect eligibility.  After each attempt, it
-// computes inclusion proofs for toolchains covered by the latest cosigned STH.
+// cosignSTHs cosigns newly-eligible STHs whenever an STH becomes consistent
+// or a toolchain is verified, and periodically in case a notification was
+// missed.  After each attempt, it computes inclusion proofs for toolchains
+// covered by the latest cosigned STH.
 func cosignSTHs(ctx context.Context, id int32, cosigner *cosign.Signer, cosignSignal <-chan struct{}) error {
 	for {
 		if err := sths.Cosign(ctx, id, cosigner); err != nil {
@@ -201,6 +201,14 @@ func handleNotification(n *pq.Notification) {
 		return
 	}
 
+	if payload.Event == "toolchain_verified" {
+		// Not specific to a sumdb, since toolchain_build has no db_id
+		for _, signals := range sumdbSignals {
+			signals.cosign.raise()
+		}
+		return
+	}
+
 	signals, ok := sumdbSignals[payload.DBID]
 	if !ok {
 		log.Printf("Ignoring database notification for unknown sumdb %d", payload.DBID)
@@ -212,6 +220,7 @@ func handleNotification(n *pq.Notification) {
 		signals.newSTH.raise()
 	case "new_position":
 		signals.newPosition.raise()
+	case "consistent_sth":
 		signals.cosign.raise()
 	default:
 		log.Printf("Ignoring database notification with unknown event %q", payload.Event)
