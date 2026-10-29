@@ -95,14 +95,15 @@
 			for example <code><a href="https://attestation.api.{{ $.Domain }}/golang.org/toolchain@v0.0.1-go1.24.0.linux-amd64">https://attestation.api.{{ $.Domain }}/golang.org/toolchain@v0.0.1-go1.24.0.linux-amd64</a></code>.
 		</p>
 		<p>
-			The response is the toolchain's checksum database record
+			The response is the toolchain's Checksum Database record
 			(two <code>go.sum</code> lines for the module zip and go.mod file),
 			a blank line, and a <a href="https://c2sp.org/tlog-proof">tlog-proof</a>.
 			The checkpoint in the tlog-proof contains two signatures:
-			the checksum database's signature (attesting that the toolchain is authentic and
-			published in the transparency log) and Source Spotter's cosignature (attesting that
-			the toolchain is published and reproducible from source).
 		</p>
+		<ul>
+			<li>The Checksum Database's signature, attesting that the toolchain is authentic and published in the transparency log.</li>
+			<li>Source Spotter's cosignature, attesting that the transparency log is consistent and that the toolchain (if Go 1.21 or newer) is reproducible from source.</li>
+		</ul>
 	</section>
 	*/}}
 	<section>

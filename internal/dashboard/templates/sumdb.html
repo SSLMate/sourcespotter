@@ -141,7 +141,7 @@
 		</p>
 		<ul>
 			<li>The STH is consistent with every STH that Source Spotter has previously cosigned.</li>
-			<li>Every Go toolchain in the tree has been <a href="/toolchain/">verified to be reproducible</a> (or skipped because that version of Go does not support reproducible builds).</li>
+			<li>Every Go toolchain in the tree has been <a href="/toolchain/">verified to be reproducible</a> (excluding toolchains before Go 1.21, which did not support reproducibility).</li>
 		</ul>
 		<p>
 			To retrieve the latest STH that we've cosigned, <code>GET</code> <code>https://gossip.api.{{ $.Domain }}/<var>$GOSUMDB</var>+toolchain</code>,
