@@ -73,10 +73,9 @@ func Cosign(ctx context.Context, sumdbid int32, signer *cosign.Signer) error {
 
 	var (
 		address      string
-		key          []byte
 		verifiedSize int64
 	)
-	if err := tx.QueryRowContext(ctx, `SELECT address, key, coalesce((verified_position->>'size')::bigint, 0) FROM db WHERE db_id = $1`, sumdbid).Scan(&address, &key, &verifiedSize); err != nil {
+	if err := tx.QueryRowContext(ctx, `SELECT address, coalesce((verified_position->>'size')::bigint, 0) FROM db WHERE db_id = $1`, sumdbid).Scan(&address, &verifiedSize); err != nil {
 		return fmt.Errorf("error loading info for sumdb %d: %w", sumdbid, err)
 	}
 
