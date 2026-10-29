@@ -42,9 +42,9 @@ import (
 
 const (
 	downloadSTHInterval = 1 * time.Minute
-	cosignSTHInterval   = 1 * time.Minute
-	auditSTHInterval    = 15 * time.Minute * 10
-	ingestSleep         = 5 * time.Minute * 10
+	cosignSTHInterval   = 15 * time.Minute
+	auditSTHInterval    = 15 * time.Minute
+	ingestSleep         = 5 * time.Minute
 	dbChannelName       = `events`
 )
 
