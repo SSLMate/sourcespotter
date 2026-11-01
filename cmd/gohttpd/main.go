@@ -106,6 +106,9 @@ func goCommand(ctx context.Context, dir string, name string, arg ...string) *exe
 	cmd := exec.CommandContext(ctx, name, arg...)
 	cmd.Env = []string{
 		"CGO_ENABLED=0",
+		// mitigate toolchain vulns that bypass CGO_ENABLED=0
+		"CC=false",
+		"CXX=false",
 		// -modcacherw for easier GOPATH management, -buildvcs=false to prevent arbitrary code execution via VCS
 		"GOFLAGS=-modcacherw -buildvcs=false",
 		"GOPATH=" + gopath,
