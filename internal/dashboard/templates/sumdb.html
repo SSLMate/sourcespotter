@@ -96,6 +96,28 @@
 		</table>
 	</section>
 	<section>
+		<h2>Malformed Records</h2>
+
+		<p>If Source Spotter detects that a checksum database has published a record which is not a well-formed, canonically-encoded go.sum record, it will be disclosed here.  Malformed records are still included in the Merkle Tree when verifying STHs, but they can't be attributed to a module version, so they do not appear in module version feeds or trigger toolchain verification.</p>
+
+		<table>
+			<thead>
+				<tr><th>Database</th><th>Position</th><th>Error</th><th>Observed At</th><th>Raw Record</th></tr>
+			</thead>
+			<tbody>
+				{{ range .MalformedRecords }}
+					<tr>
+						<td>{{ .SumDB }}</td>
+						<td>{{ .Position }}</td>
+						<td>{{ .Error }}</td>
+						<td>{{ .ObservedAt.Format "2006-01-02 15:04:05 UTC" }}</td>
+						<td><a download="{{ .SumDB }}-record-{{ .Position }}.bin" href="{{ .DownloadURL }}">Download</a></td>
+					</tr>
+				{{ end }}
+			</tbody>
+		</table>
+	</section>
+	<section>
 		<h2>Gossip</h2>
 
 		<p>

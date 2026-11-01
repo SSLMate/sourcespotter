@@ -103,12 +103,28 @@ type DuplicateRecord struct {
 	ObservedAt       time.Time
 }
 
+// MalformedRecord is a record that was included in the tree (so its hash still
+// contributes to root hash verification) but could not be parsed as a go.sum
+// record, or was not in canonical form.
+type MalformedRecord struct {
+	SumDB      string
+	Position   uint64
+	LeafData   []byte
+	Error      string
+	ObservedAt time.Time
+}
+
+func (rec *MalformedRecord) DownloadURL() template.URL {
+	return template.URL("data:application/octet-stream;base64," + base64.StdEncoding.EncodeToString(rec.LeafData))
+}
+
 type Dashboard struct {
 	Domain           string
 	CosignerKey      string // verifier key for cosigned STHs, or empty if cosigning is not enabled
 	SumDBs           []SumDB
 	InconsistentSTHs []InconsistentSTH
 	DuplicateRecords []DuplicateRecord
+	MalformedRecords []MalformedRecord
 }
 
 func LoadDashboard(ctx context.Context) (*Dashboard, error) {
@@ -158,6 +174,21 @@ func LoadDashboard(ctx context.Context) (*Dashboard, error) {
 		FROM record
 		JOIN db USING (db_id)
 		WHERE record.previous_position IS NOT NULL
+		ORDER BY record.db_id, record.position
+	`); err != nil {
+		return nil, err
+	}
+
+	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dashboard.MalformedRecords, `
+                SELECT
+                        db.address AS "SumDB",
+                        record.position AS "Position",
+                        record.leaf_data AS "LeafData",
+                        record.error AS "Error",
+                        record.observed_at AS "ObservedAt"
+		FROM record
+		JOIN db USING (db_id)
+		WHERE record.error IS NOT NULL
 		ORDER BY record.db_id, record.position
 	`); err != nil {
 		return nil, err

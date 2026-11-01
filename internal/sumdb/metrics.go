@@ -56,6 +56,8 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 		LatestInconsistentSTH sql.Null[time.Time] `sql:"latest_inconsistent_sth"`
 		DuplicateRecords      int64               `sql:"duplicate_records"`
 		LatestDuplicateRecord sql.Null[time.Time] `sql:"latest_duplicate_record"`
+		MalformedRecords      int64               `sql:"malformed_records"`
+		LatestMalformedRecord sql.Null[time.Time] `sql:"latest_malformed_record"`
 	}
 	if err := dbutil.QueryAll(ctx, sourcespotter.DB, &dbs, `
 		SELECT
@@ -72,7 +74,9 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 			(SELECT COUNT(*) FROM sth WHERE db_id = db.db_id AND consistent = FALSE) AS inconsistent_sths,
 			(SELECT MAX(observed_at) FROM sth WHERE db_id = db.db_id AND consistent = FALSE) AS latest_inconsistent_sth,
 			(SELECT COUNT(*) FROM record WHERE db_id = db.db_id AND previous_position IS NOT NULL) AS duplicate_records,
-			(SELECT MAX(observed_at) FROM record WHERE db_id = db.db_id AND previous_position IS NOT NULL) AS latest_duplicate_record
+			(SELECT MAX(observed_at) FROM record WHERE db_id = db.db_id AND previous_position IS NOT NULL) AS latest_duplicate_record,
+			(SELECT COUNT(*) FROM record WHERE db_id = db.db_id AND error IS NOT NULL) AS malformed_records,
+			(SELECT MAX(observed_at) FROM record WHERE db_id = db.db_id AND error IS NOT NULL) AS latest_malformed_record
 		FROM db
 		ORDER BY db.address
 	`); err != nil {
@@ -89,6 +93,7 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 	unverified := prom.NewGauge("sourcespotter_sumdb_unverified_sths", "Number of observed STHs not yet checked for consistency.")
 	inconsistentCount := prom.NewGauge("sourcespotter_sumdb_inconsistent_sths", "Number of observed STHs whose root hash does not match the downloaded records.")
 	duplicates := prom.NewGauge("sourcespotter_sumdb_duplicate_records", "Number of records that duplicate an earlier record for the same module version.")
+	malformed := prom.NewGauge("sourcespotter_sumdb_malformed_records", "Number of records that could not be parsed as canonical go.sum records.")
 	failureLatest := prom.NewGauge("sourcespotter_sumdb_failure_latest_timestamp_seconds", "Unix time of the most recently observed failure of the given kind. Absent if no failure of that kind has been observed.")
 
 	for _, db := range dbs {
@@ -124,10 +129,14 @@ func Metrics(ctx context.Context) ([]*prom.Family, error) {
 		if db.LatestDuplicateRecord.Valid {
 			failureLatest.AddTimestamp(db.LatestDuplicateRecord.V, "sumdb", db.Address, "kind", "duplicate_record")
 		}
+		malformed.Add(float64(db.MalformedRecords), "sumdb", db.Address)
+		if db.LatestMalformedRecord.Valid {
+			failureLatest.AddTimestamp(db.LatestMalformedRecord.V, "sumdb", db.Address, "kind", "malformed_record")
+		}
 	}
 
 	return []*prom.Family{
 		largestSize, largestTime, downloadSize, verifiedSize, verifiedTime, cosignedSize, cosignedTime, unverified,
-		inconsistentCount, duplicates, failureLatest,
+		inconsistentCount, duplicates, malformed, failureLatest,
 	}, nil
 }

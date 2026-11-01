@@ -26,6 +26,7 @@
 package sumdb
 
 import (
+	"encoding/base64"
 	"encoding/xml"
 	"fmt"
 	"log"
@@ -78,6 +79,17 @@ func ServeFailuresAtom(w http.ResponseWriter, req *http.Request) {
 			ID:      fmt.Sprintf("%s#dup-%s-%d", feedURL, rec.SumDB, rec.Position),
 			Updated: rec.ObservedAt.UTC().Format(time.RFC3339Nano),
 			Content: atom.Content{Type: "text", Body: fmt.Sprintf("SumDB: %s\nModule: %s\nVersion: %s\nPosition: %d\nPrevious Position: %d\n", rec.SumDB, rec.Module, rec.Version, rec.Position, rec.PreviousPosition)},
+		}
+		feed.Entries = append(feed.Entries, entry)
+	}
+
+	for _, rec := range dashboard.MalformedRecords {
+		addTime(rec.ObservedAt)
+		entry := atom.Entry{
+			Title:   fmt.Sprintf("Malformed record in %s", rec.SumDB),
+			ID:      fmt.Sprintf("%s#malformed-%s-%d", feedURL, rec.SumDB, rec.Position),
+			Updated: rec.ObservedAt.UTC().Format(time.RFC3339Nano),
+			Content: atom.Content{Type: "text", Body: fmt.Sprintf("SumDB: %s\nPosition: %d\nError: %s\nRaw Record (base64): %s\n", rec.SumDB, rec.Position, rec.Error, base64.StdEncoding.EncodeToString(rec.LeafData))},
 		}
 		feed.Entries = append(feed.Entries, entry)
 	}
