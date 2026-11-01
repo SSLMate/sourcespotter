@@ -79,7 +79,14 @@ CREATE TABLE record (
 	previous_position	bigint,
 	leaf_data		bytea,
 	error			text,
-	PRIMARY KEY (db_id, position)
+	PRIMARY KEY (db_id, position),
+	-- A record is either well-formed (module, version, and hashes set) or
+	-- malformed (raw leaf_data and a parse error set), never a mix.
+	CHECK (
+		(module IS NOT NULL AND version IS NOT NULL AND source_sha256 IS NOT NULL AND gomod_sha256 IS NOT NULL AND leaf_data IS NULL AND error IS NULL)
+		OR
+		(module IS NULL AND version IS NULL AND source_sha256 IS NULL AND gomod_sha256 IS NULL AND leaf_data IS NOT NULL AND error IS NOT NULL)
+	)
 );
 CREATE INDEX record_module ON record (module, version, db_id, position DESC);
 CREATE INDEX duplicate_module ON record (db_id) WHERE previous_position IS NOT NULL;
