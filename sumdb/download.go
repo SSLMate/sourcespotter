@@ -101,7 +101,7 @@ type RecordOrError struct {
 	Error    string
 }
 
-func (r *RecordOrError) LeafHash() merkletree.Hash {
+func (r RecordOrError) LeafHash() merkletree.Hash {
 	if r.Record != nil {
 		return merkletree.HashLeaf(r.Record.Format())
 	} else {
