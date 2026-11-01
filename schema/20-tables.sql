@@ -70,17 +70,20 @@ CREATE UNIQUE INDEX cosigned_sth_sth_id ON cosigned_sth (sth_id);
 CREATE TABLE record (
 	db_id			int NOT NULL REFERENCES db,
 	position		bigint NOT NULL,
-	module			text NOT NULL,
-	version			text NOT NULL,
-	source_sha256		bytea NOT NULL,
-	gomod_sha256		bytea NOT NULL,
+	module			text,
+	version			text,
+	source_sha256		bytea,
+	gomod_sha256		bytea,
 	root_hash		bytea NOT NULL,
 	observed_at		timestamptz NOT NULL DEFAULT statement_timestamp(),
 	previous_position	bigint,
+	leaf_data		bytea,
+	error			text,
 	PRIMARY KEY (db_id, position)
 );
 CREATE INDEX record_module ON record (module, version, db_id, position DESC);
 CREATE INDEX duplicate_module ON record (db_id) WHERE previous_position IS NOT NULL;
+CREATE INDEX record_with_error ON record ((1)) WHERE error IS NOT NULL;
 
 CREATE TABLE authorized_record (
         -- pubkey is type-prefixed: \x00 followed by an ed25519 public key,

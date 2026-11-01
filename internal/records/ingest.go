@@ -100,7 +100,7 @@ func (state *ingestState) begin(ctx context.Context) error {
 		return fmt.Errorf("sumdb %d has been modified by a different process", state.id)
 	}
 
-	stmt, err := tx.PrepareContext(ctx, pq.CopyIn("record", "db_id", "position", "module", "version", "source_sha256", "gomod_sha256", "root_hash"))
+	stmt, err := tx.PrepareContext(ctx, pq.CopyIn("record", "db_id", "position", "module", "version", "source_sha256", "gomod_sha256", "root_hash", "leaf_data", "error"))
 	if err != nil {
 		return fmt.Errorf("error preparing COPY statement: %w", err)
 	}
@@ -159,14 +159,20 @@ func (state *ingestState) checkpoint(ctx context.Context, verified bool) error {
 	return nil
 }
 
-func (state *ingestState) addRecord(ctx context.Context, record *sumdb.Record) error {
-	leafHash := record.Hash()
+func (state *ingestState) addRecord(ctx context.Context, record sumdb.RecordOrError) error {
+	leafHash := record.LeafHash()
 	position := state.tree.Size()
 	state.tree.Add(leafHash)
 	rootHash := state.tree.CalculateRoot()
 
-	if _, err := state.copyStmt.ExecContext(ctx, state.id, position, record.Module, record.Version, record.SourceSHA256, record.GomodSHA256, rootHash[:]); err != nil {
-		return fmt.Errorf("error COPYing record: %w", err)
+	if record.Record != nil {
+		if _, err := state.copyStmt.ExecContext(ctx, state.id, position, record.Record.Module, record.Record.Version, record.Record.SourceSHA256, record.Record.GomodSHA256, rootHash[:], nil, nil); err != nil {
+			return fmt.Errorf("error COPYing record: %w", err)
+		}
+	} else {
+		if _, err := state.copyStmt.ExecContext(ctx, state.id, position, nil, nil, nil, nil, rootHash[:], record.LeafData, record.Error); err != nil {
+			return fmt.Errorf("error COPYing record: %w", err)
+		}
 	}
 	state.pendingRecords++
 
@@ -207,7 +213,7 @@ func Ingest(ctx context.Context, id int32) (bool, error) {
 		downloadBegin = state.tree.Size()
 		downloadEnd   = state.sths[len(state.sths)-1].TreeSize
 	)
-	records := make(chan *sumdb.Record, sumdb.RecordsPerTile*2)
+	records := make(chan sumdb.RecordOrError, sumdb.RecordsPerTile*2)
 	var downloadErr error
 	go func() {
 		defer close(records)

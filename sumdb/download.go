@@ -37,6 +37,7 @@ import (
 	"time"
 
 	"golang.org/x/mod/sumdb/tlog"
+	"software.sslmate.com/src/certspotter/merkletree"
 )
 
 var httpClient = http.DefaultClient
@@ -94,7 +95,21 @@ func fetch(ctx context.Context, url string) ([]byte, error) {
 	return body, nil
 }
 
-func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]*Record, error) {
+type RecordOrError struct {
+	Record   *Record
+	LeafData []byte
+	Error    string
+}
+
+func (r *RecordOrError) LeafHash() merkletree.Hash {
+	if r.Record != nil {
+		return merkletree.HashLeaf(r.Record.Format())
+	} else {
+		return merkletree.HashLeaf(r.LeafData)
+	}
+}
+
+func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]RecordOrError, error) {
 	tile := begin / RecordsPerTile
 	skip := begin % RecordsPerTile
 	count := end - tile*RecordsPerTile
@@ -119,18 +134,19 @@ func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]*Re
 	}
 	records = records[skip:]
 
-	parsedRecords := make([]*Record, len(records))
+	parsedRecords := make([]RecordOrError, len(records))
 	for i, recordBytes := range records {
 		if parsedRecord, err := ParseRecord(recordBytes); err != nil {
-			return nil, fmt.Errorf("%s returned invalid record at %d: %w", url, skip+uint64(i), err)
+			parsedRecords[i].LeafData = recordBytes
+			parsedRecords[i].Error = err.Error()
 		} else {
-			parsedRecords[i] = parsedRecord
+			parsedRecords[i].Record = parsedRecord
 		}
 	}
 	return parsedRecords, nil
 }
 
-func DownloadRecords(ctx context.Context, address string, begin, end uint64, recordsOut chan<- *Record) error {
+func DownloadRecords(ctx context.Context, address string, begin, end uint64, recordsOut chan<- RecordOrError) error {
 	numRetries := 0
 
 	for begin < end && ctx.Err() == nil {
@@ -189,7 +205,7 @@ func DownloadAndAuthenticateSTH(ctx context.Context, address string, key []byte)
 	return sth, nil
 }
 
-func sendAllRecords(ctx context.Context, ch chan<- *Record, values []*Record) error {
+func sendAllRecords(ctx context.Context, ch chan<- RecordOrError, values []RecordOrError) error {
 	for _, value := range values {
 		if ctx.Err() != nil {
 			return ctx.Err()
