@@ -27,6 +27,8 @@ package sumdb
 
 import (
 	"testing"
+
+	"software.sslmate.com/src/certspotter/merkletree"
 )
 
 func TestFormatTileIndex(t *testing.T) {
@@ -49,6 +51,38 @@ func TestFormatTileIndex(t *testing.T) {
 		result := formatTileIndex(test.in)
 		if result != test.out {
 			t.Errorf("#%d: formatTileIndex(%d) = %q, want %q", i, test.in, result, test.out)
+		}
+	}
+}
+
+func TestParseRecordOrError(t *testing.T) {
+	const canonical = "example.com/m v1.0.0 h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\nexample.com/m v1.0.0/go.mod h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n"
+	tests := []struct {
+		name    string
+		in      string
+		wantErr bool
+	}{
+		{"canonical", canonical, false},
+		{"unparseable", "garbage\n", true},
+		// Go's base64 decoder accepts non-zero trailing padding bits...
+		{"noncanonical base64", "example.com/m v1.0.0 h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB=\nexample.com/m v1.0.0/go.mod h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n", true},
+		// ...and ignores embedded carriage returns.
+		{"embedded CR", "example.com/m v1.0.0 h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\r=\nexample.com/m v1.0.0/go.mod h1:AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\n", true},
+	}
+	for _, test := range tests {
+		got := parseRecordOrError([]byte(test.in))
+		if test.wantErr {
+			if got.Record != nil || got.Error == "" || string(got.LeafData) != test.in {
+				t.Errorf("%s: got %+v, want error with raw leaf data", test.name, got)
+			}
+		} else {
+			if got.Record == nil || got.Error != "" || got.LeafData != nil {
+				t.Errorf("%s: got %+v, want parsed record", test.name, got)
+			}
+		}
+		// Regardless of outcome, the leaf hash must be that of the raw bytes.
+		if want := merkletree.HashLeaf([]byte(test.in)); got.LeafHash() != want {
+			t.Errorf("%s: LeafHash() = %x, want %x", test.name, got.LeafHash(), want)
 		}
 	}
 }

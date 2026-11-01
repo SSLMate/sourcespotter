@@ -109,6 +109,21 @@ func (r RecordOrError) LeafHash() merkletree.Hash {
 	}
 }
 
+// parseRecordOrError parses a raw sumdb record.  If the record can't be parsed,
+// or if it parses but is not in canonical form (so that re-serializing it would
+// not reproduce the original bytes, and hence the original leaf hash), the raw
+// bytes and the error are returned instead of a parsed record.
+func parseRecordOrError(recordBytes []byte) RecordOrError {
+	parsedRecord, err := ParseRecord(recordBytes)
+	if err != nil {
+		return RecordOrError{LeafData: recordBytes, Error: err.Error()}
+	}
+	if !bytes.Equal(parsedRecord.Format(), recordBytes) {
+		return RecordOrError{LeafData: recordBytes, Error: "record is not in canonical form"}
+	}
+	return RecordOrError{Record: parsedRecord}
+}
+
 func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]RecordOrError, error) {
 	tile := begin / RecordsPerTile
 	skip := begin % RecordsPerTile
@@ -136,12 +151,7 @@ func fetchRecords(ctx context.Context, address string, begin, end uint64) ([]Rec
 
 	parsedRecords := make([]RecordOrError, len(records))
 	for i, recordBytes := range records {
-		if parsedRecord, err := ParseRecord(recordBytes); err != nil {
-			parsedRecords[i].LeafData = recordBytes
-			parsedRecords[i].Error = err.Error()
-		} else {
-			parsedRecords[i].Record = parsedRecord
-		}
+		parsedRecords[i] = parseRecordOrError(recordBytes)
 	}
 	return parsedRecords, nil
 }
